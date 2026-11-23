@@ -21,6 +21,8 @@ export interface EngineSettings {
   maxCtanPackageMB: number
   /** Give up on a single download (package, font) after this long. */
   downloadTimeoutSeconds: number
+  /** Keep converted fonts and package-server files across engine restarts, up to this size (0: off). */
+  persistCacheMB: number
 }
 
 export interface InitMessage {
@@ -72,7 +74,10 @@ export interface ClearMessage {
 /** Test builds only: breaks the WASM module for good, like an out-of-memory abort would. */
 export interface DebugAbortMessage { type: 'debugAbort' }
 
-export type ToWorker = InitMessage | SyncMessage | CompileMessage | ClearMessage | DebugAbortMessage
+/** Test builds only: lists files changed since the engine started, outside project folders. */
+export interface DebugChangedFilesMessage { type: 'debugChangedFiles' }
+
+export type ToWorker = InitMessage | SyncMessage | CompileMessage | ClearMessage | DebugAbortMessage | DebugChangedFilesMessage
 
 export type CompileStatus = 'success' | 'failure' | 'stopped-on-first-error' | 'error'
 

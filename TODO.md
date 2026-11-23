@@ -28,13 +28,18 @@
   simulates it with a test-build-only hook).
 - [x] `minted` / shell-escape: detected (errors + shell-escape messages) and compiled on the server
   (`serverOnShellEscape`); engine test case.
-- [ ] Root cause of the intermittent "TeX capacity exceeded" after fetching fonts (worked around by a retry).
+- [ ] Root cause of the intermittent "TeX capacity exceeded" after fetching fonts (worked around by a retry;
+  not reproducible natively, so likely inside the WASM build's memory restore between runs).
 
-- [ ] Intermittent: compile right after renaming a file missed the new name (2 of ~10 full-suite runs). Mitigated by
-  applying tree changes from Overleaf's own requests and waiting for in-flight ones in the compile barrier;
-  "file tree: … applied" is now logged to see the order if it shows up again.
+- [x] Intermittent rename failure in the extremes test: the logged mirror paths showed the file really was
+  renamed to "umbenannt.tex.tex": a test timing bug (Ctrl+A before the rename box had focus), not LocaLeaf.
+  The test now fills the box. (Tree changes are applied from Overleaf's requests and in-flight ones are awaited,
+  which stays as a safeguard.)
 
 ## Nice to have
 
 - [x] Packaged release: `npm run package` → `release/localeaf-<version>.zip` (no personal sites in it).
-- [ ] Faster first compile with non-bundled fonts (luaotfload rescans in WASM take 15–30 s).
+- [x] Faster first compile with non-bundled fonts: converted LuaTeX font caches and package-server files are
+  kept in IndexedDB across engine restarts (`engine.persistCacheMB`). LuaLaTeX with Fira Sans: first compile of a
+  new session 19 s → 3 s. XeLaTeX stays ~30 s on the first compile per session: its fontconfig scan lives only in
+  memory in this build (no cache files to keep; tried a writable cachedir, it isn't used).

@@ -92,6 +92,33 @@ try {
       console.log('    passes: ' + first.passes.join(' → '))
     }
   }
+
+  // Engine restart (new worker, same browser profile): converted fonts come back from IndexedDB.
+  const fontCase = results.find(r => r.case === 'fonts-fira-lualatex')
+  if (fontCase) {
+    h.step('engine restart keeps converted fonts')
+    // saving happens in the background after each compile: wait until no new "persist:" lines appear
+    let seen = 0
+    await h.waitFor('the cache save to settle', async () => {
+      const n = (await page.evaluate(() => window.engine.prints())).filter(l => l.startsWith('persist:')).length
+      const settled = n === 0 && seen > 0
+      seen += n
+      return settled
+    }, h.stepMs, 1500)
+    await page.reload()
+    await page.waitForFunction(() => window.engineReady)
+    await page.evaluate(o => window.engine.init(o), {
+      basePath: '/vendor/busytex', bundles: engineCfg.bundles, remoteEndpoint: defaults.remoteEndpoint, fontIndexUrl: '/config/font-index.json', texliveIndexUrl: '/config/texlive-files.json.gz', ctanMirror: `${server.origin}/ctan`, settings: defaults.engine,
+    })
+    const restored = (await page.evaluate(() => window.engine.prints())).find(l => /^restored \d+ cached files/.test(l)) ?? ''
+    await page.evaluate(() => window.engine.sync('after-restart', [{ path: 'main.tex', url: '/projects/fonts-fira/main.tex' }], { reset: true }))
+    const again = await page.evaluate(() => window.engine.compile('after-restart', { main: 'main.tex', compiler: 'lualatex', draft: false, stopOnFirstError: false }))
+    const firstS = parseFloat(fontCase.first)
+    const ok = again.status === 'success' && again.errors === 0 && !!restored && again.ms / 1000 < firstS / 3
+    if (!ok) failed++
+    results.push({ case: 'restart keeps fonts', result: ok ? 'ok' : 'FAIL', first: `${(again.ms / 1000).toFixed(2)}s/${again.passes.length}p`, unchanged: '', edit: '', status: again.status, errors: again.errors })
+    if (!ok) console.log(`FAIL restart keeps fonts: ${restored || 'nothing restored'}, ${(again.ms / 1000).toFixed(1)} s vs first ${firstS} s`)
+  }
 } catch (e) {
   failed++
   console.log(`ERROR: ${e?.message ?? e}`)

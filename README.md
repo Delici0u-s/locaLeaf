@@ -116,6 +116,7 @@ The popup lists every setting with its current value. Defaults live in
 | `engine.maxPasses` | 5 | TeX passes per compile at most |
 | `engine.biberArgs` | `--output-safechars` | Works around an encoding bug in the WASM biber |
 | `engine.maxProjects` | 4 | Projects kept in engine memory |
+| `engine.persistCacheMB` | 300 | Converted fonts and downloaded files kept across engine restarts (faster first compile) |
 | `engineIdleMinutes` | 15 | Close the engine when unused (frees memory) |
 | `fallbackToServer` | true | Compile on the server if a local compile can't run |
 | `serverOnMissingFonts` | true | Compile on the server if fonts can't be provided locally |
@@ -125,7 +126,7 @@ The popup lists every setting with its current value. Defaults live in
 
 - **Packages and fonts outside the built-in bundle** are fetched on first use: from `remoteEndpoint`, and if
   that doesn't have them (~8% of TeX Live), as their TeX Live package from the CTAN mirror (`ctanMirror`).
-  Both are cached. Fonts picked by family name (`\setmainfont{Source Sans 3}`) are found through an index of
+  Both are cached, also across browser restarts. Fonts picked by family name (`\setmainfont{Source Sans 3}`) are found through an index of
   TeX Live's fonts. The first compile that needs new fonts takes 15–30 s, because the engine scans and
   converts them.
 - What can't be provided locally at all (e.g. `kaobook`, which isn't in TeX Live) makes the project compile

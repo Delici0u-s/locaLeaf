@@ -32,7 +32,9 @@
     "fetchFromCtan": true,
     "maxCtanPackageMB": 60,
     "downloadTimeoutSeconds": 120,
-    "$maxCtanPackageMB": "CTAN packages larger than this aren't downloaded (font collections like Noto are hundreds of MB); projects needing them compile on the server."
+    "$maxCtanPackageMB": "CTAN packages larger than this aren't downloaded (font collections like Noto are hundreds of MB); projects needing them compile on the server.",
+    "persistCacheMB": 300,
+    "$persistCacheMB": "Converted fonts and downloaded TeX Live files kept across engine restarts (IndexedDB), up to this size. 0 = off."
   },
   "keepBuilds": 3,
   "barrierTimeoutMs": 3000,

@@ -47,5 +47,7 @@ window.engine = {
     }
   },
   prints: () => prints.splice(0),
+  /** Sends any worker message (test hooks) and resolves with the reply. */
+  raw: msg => request(msg),
 }
 window.engineReady = true

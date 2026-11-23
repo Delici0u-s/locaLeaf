@@ -32,6 +32,7 @@ let pipeline: any = null
 let Module: any = null
 let settings: EngineSettings
 let remoteEndpoint = ''
+let initTime = 0
 let fontIndexUrl = ''
 let fontIndex: Promise<{ names: Record<string, string[]> } | null> | null = null
 let ctanMirror = ''
@@ -58,6 +59,22 @@ self.onmessage = async ({ data }: MessageEvent<ToWorker>) => {
     else if (data.type === 'compile') {
       const result = await compile(data)
       post({ type: 'compiled', id: data.id, result }, Object.values(result.files).map(f => f.buffer as ArrayBuffer))
+      persistCaches().catch(e => post({ type: 'print', text: `saving caches failed: ${e}` })) // after replying
+    } else if (data.type === 'debugChangedFiles' && __TEST_HOOKS__) {
+      const out: string[] = []
+      const walk = (dir: string) => {
+        for (const name of Module.FS.readdir(dir) as string[]) {
+          if (name === '.' || name === '..') continue
+          const full = joinPath(dir, name)
+          if (full.startsWith(PROJECTS_ROOT) || full.startsWith('/dev') || full.startsWith('/proc')) continue
+          const st = Module.FS.stat(full)
+          if (Module.FS.isDir(st.mode)) walk(full)
+          else if (st.mtime.getTime() > initTime) out.push(`${full} ${st.size}`)
+        }
+      }
+      walk('/')
+      post({ type: 'print', text: `CHANGED ${JSON.stringify(out)}` })
+      post({ type: 'cleared', projectId: '' })
     } else if (data.type === 'debugAbort' && __TEST_HOOKS__) {
       // Wipe the module's memory: every later TeX run dies with a RuntimeError, as after an out-of-memory abort.
       Module.HEAPU8.fill(0)
@@ -91,9 +108,11 @@ async function init(basePath: string, bundles: string[], remoteEndpoint: string,
   )
   await pipeline.on_initialized_promise
   Module = await pipeline.Module
+  initTime = Date.now()
   Module.ENV.TEXLIVE_REMOTE_ENDPOINT = remoteEndpoint
   setRemote(remoteEndpoint)
   mkdirP(PROJECTS_ROOT)
+  await restorePersisted().catch(e => post({ type: 'print', text: `restoring caches failed: ${e}` }))
   post({ type: 'ready', versions: Object.fromEntries(Object.entries(versions).map(([k, v]) => [k, String(v).split('\n')[0]])) })
 }
 
@@ -354,33 +373,123 @@ async function provideFromCtan(files: string[]): Promise<number> {
   return results.filter(r => r.length > 0).length
 }
 
+// ---- caches that survive engine restarts ----
+// luaotfload's converted fonts (expensive in WASM: the first LuaLaTeX compile of a new session drops from ~19 s
+// to ~3 s with them) and every file the package server delivered. Saved to IndexedDB after compiles, restored
+// when the engine starts. (XeTeX's fontconfig keeps its scan in memory only; nothing to keep there.)
+
+const REMOTE_DIR = '/tmp/texlive_remote'
+// luaotfload's font name database lives in the read-only bundle (it can't be written back), so only the fonts
+const persistDirs = () => [joinPath(pipeline.dir_texmfvar, 'luatex-cache/generic/fonts'), REMOTE_DIR]
+
+const PERSIST_INDEX = 'persist:index'
+/** path → "size:mtime" of what IndexedDB has. */
+let persisted = new Map<string, string>()
+
+async function persistCaches() {
+  if (!settings.persistCacheMB) { post({ type: 'print', text: 'persist: off' }); return }
+  const FS = Module.FS
+  const budget = settings.persistCacheMB * 1024 * 1024
+  let total = 0
+  const current: [string, string, number][] = []
+  for (const dir of persistDirs()) {
+    for (const rel of listFiles(dir)) {
+      const path = joinPath(dir, rel)
+      const st = FS.stat(path)
+      current.push([path, `${st.size}:${st.mtime.getTime()}`, st.size])
+    }
+  }
+  let changed = false
+  for (const [path, stamp, size] of current) {
+    if (total + size > budget) continue
+    total += size
+    if (persisted.get(path) === stamp) continue
+    const bytes: Uint8Array = FS.readFile(path)
+    await cachePut(`persist:${path}`, bytes.slice().buffer)
+    persisted.set(path, stamp)
+    changed = true
+  }
+  if (changed) await cachePut(PERSIST_INDEX, new TextEncoder().encode(JSON.stringify([...persisted])).buffer)
+  post({ type: 'print', text: `persist: ${current.length} cache files, ${persisted.size} saved (${(total / 1048576).toFixed(1)} MB)` })
+}
+
+async function restorePersisted() {
+  const index = await cacheGet(PERSIST_INDEX)
+  if (!index) return
+  persisted = new Map(JSON.parse(new TextDecoder().decode(index)))
+  let restored = 0
+  const failures: Record<string, number> = {}
+  let firstFailure = ''
+  for (const [path, stamp] of persisted) {
+    const buf = await cacheGet(`persist:${path}`)
+    if (!buf) { persisted.delete(path); continue }
+    const bytes = new Uint8Array(buf)
+    let step = 'write'
+    try {
+      if (path.startsWith(REMOTE_DIR + '/')) {
+        // KPSE_REMOTE saves "<format>_<name>"; registering puts the file back where TeX looks for it.
+        const m = path.slice(REMOTE_DIR.length + 1).match(/^(\d+)_([A-Za-z0-9._-]+)$/)
+        if (!m) continue
+        step = 'register'
+        Module.kpse_remote_register(m[2], Number(m[1]), bytes)
+      } else {
+        step = 'mkdir'
+        mkdirP(dirname(path))
+        step = 'write'
+        Module.FS.writeFile(path, bytes)
+      }
+      // luaotfload checks its font caches against the fonts' timestamps: restore the original ones
+      step = 'utime'
+      const mtime = Number(stamp.split(':')[1])
+      Module.FS.utime(path, mtime, mtime)
+      restored++
+    } catch (e) {
+      failures[step] = (failures[step] ?? 0) + 1
+      if (!firstFailure) firstFailure = `${step} ${path}: ${e}`
+    }
+  }
+  if (firstFailure) post({ type: 'print', text: `restore failures ${JSON.stringify(failures)}; first: ${firstFailure}` })
+  post({ type: 'print', text: `restored ${restored} cached files` })
+}
+
 let cacheDb: Promise<IDBDatabase | null> | null = null
-/** IndexedDB-backed cache in the extension origin (fonts, CTAN archives). */
-async function cached(key: string, load: () => Promise<ArrayBuffer | null>): Promise<ArrayBuffer | null> {
+function openCacheDb(): Promise<IDBDatabase | null> {
   cacheDb ??= new Promise(resolve => {
     const req = indexedDB.open('olr-engine-cache', 1)
     req.onupgradeneeded = () => req.result.createObjectStore('files')
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => resolve(null)
   })
-  const db = await cacheDb
-  const get = () => new Promise<ArrayBuffer | null>(resolve => {
+  return cacheDb
+}
+
+async function cacheGet(key: string): Promise<ArrayBuffer | null> {
+  const db = await openCacheDb()
+  return new Promise(resolve => {
     if (!db) return resolve(null)
     const req = db.transaction('files').objectStore('files').get(key)
     req.onsuccess = () => resolve(req.result ?? null)
     req.onerror = () => resolve(null)
   })
-  const hit = await get()
+}
+
+async function cachePut(key: string, value: ArrayBuffer): Promise<void> {
+  const db = await openCacheDb()
+  if (!db) return
+  return new Promise(resolve => {
+    const tx = db.transaction('files', 'readwrite')
+    tx.objectStore('files').put(value, key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+}
+
+/** IndexedDB-backed cache in the extension origin (fonts, CTAN archives). */
+async function cached(key: string, load: () => Promise<ArrayBuffer | null>): Promise<ArrayBuffer | null> {
+  const hit = await cacheGet(key)
   if (hit) return hit
   const value = await load()
-  if (value && db) {
-    await new Promise<void>(resolve => {
-      const tx = db.transaction('files', 'readwrite')
-      tx.objectStore('files').put(value, key)
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => resolve()
-    })
-  }
+  if (value) await cachePut(key, value)
   return value
 }
 

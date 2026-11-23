@@ -27,7 +27,8 @@
         "ctanMirror",
         "engine.fetchMissingFonts",
         "engine.maxCtanPackageMB",
-        "engine.downloadTimeoutSeconds"
+        "engine.downloadTimeoutSeconds",
+        "engine.persistCacheMB"
       ]
     },
     {
@@ -136,6 +137,11 @@
     "serverOnShellEscape": {
       "label": "…if the document needs shell escape",
       "help": "minted, svg, gnuplot: the local engine can't run external programs."
+    },
+    "engine.persistCacheMB": {
+      "label": "Keep downloads and converted fonts up to",
+      "unit": "MB",
+      "help": "Makes the first compile after a browser restart faster. 0: off."
     }
   }
 }

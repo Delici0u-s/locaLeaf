@@ -132,9 +132,11 @@ try {
   await page.locator(`.file-tree [role=treeitem]:has-text("${UMLAUT_DIR}")`).first().click()
   await page.locator(`.file-tree [role=treeitem]:has-text("${UMLAUT_FILE}")`).first().click({ button: 'right' })
   await page.locator('[role=menuitem]:has-text("Rename"):visible').last().click()
-  await page.keyboard.press('ControlOrMeta+a')
-  await page.keyboard.type(RENAMED)
-  await page.keyboard.press('Enter')
+  // Overleaf pre-selects the name without the extension; fill the box instead of relying on key timing
+  // (a Ctrl+A before the box had focus once produced "umbenannt.tex.tex").
+  const box = page.locator('.file-tree input[type=text]:visible').first()
+  await box.fill(RENAMED)
+  await box.press('Enter')
   await page.locator(`.file-tree [role=treeitem]:has-text("${RENAMED}")`).first().waitFor()
   h.step('pointing \\input at the new name')
   await page.locator('.file-tree [role=treeitem]:has-text("main.tex")').first().click()
