@@ -31,6 +31,7 @@ async function engineConfigForOffscreen() {
   const settings = mergeSettings(await getStored('settings'))
   return {
     idleMinutes: settings.engineIdleMinutes,
+    ctanMirror: settings.ctanMirror,
     basePath: chrome.runtime.getURL('busytex').replace(/\/$/, ''),
     bundles: engineConfig.bundles,
     remoteEndpoint: settings.remoteEndpoint,

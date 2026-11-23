@@ -32,6 +32,7 @@ await Promise.all([
 ])
 cpSync(join(ROOT, 'extension/static'), DIST, { recursive: true })
 cpSync(join(ROOT, 'config/font-index.json'), join(DIST, 'font-index.json'))
+cpSync(join(ROOT, 'config/texlive-files.json.gz'), join(DIST, 'texlive-files.json.gz'))
 
 // Engine assets: only what config/engine.json lists (hard links when possible; they're large).
 const assets = join(DIST, 'busytex')
@@ -44,7 +45,8 @@ for (const name of names) {
 const manifest = JSON.parse(readFileSync(join(ROOT, 'extension/manifest.json'), 'utf8'))
 manifest.version = pkg.version ?? manifest.version
 if (devOrigins.length) {
-  manifest.host_permissions = [...(manifest.host_permissions ?? []), ...devOrigins.map(o => `${o}/*`)]
+  const mirror = new URL(readJson('config/settings.defaults.json').ctanMirror).origin
+  manifest.host_permissions = [...(manifest.host_permissions ?? []), ...devOrigins.map(o => `${o}/*`), `${mirror}/*`]
   const matches = devOrigins.map(o => `${o}/project/*`)
   manifest.content_scripts = [
     { matches, js: ['page.js'], run_at: 'document_start', world: 'MAIN' },

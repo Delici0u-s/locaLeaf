@@ -27,8 +27,8 @@ Then open `brave://extensions` (or `chrome://extensions`), turn on **Developer m
 ## Use
 
 1. Open a project on your Overleaf server.
-2. Click the extension icon → **Enable on this site** (your browser asks for access to that site).
-   The page reloads.
+2. Click the extension icon → **Enable on this site**. Your browser asks for access to that site and to
+   the CTAN mirror (used for TeX Live packages the extension doesn't ship). The page reloads.
 3. Compile as usual. The badge shows **L** when the last compile ran locally and **S** when it fell
    back to the server. In that case a notice in the page says why.
 
@@ -69,6 +69,7 @@ The popup lists every setting with its current value. Defaults live in
 | Setting | Default | What it does |
 |---|---|---|
 | `remoteEndpoint` | TeXlyre's TeX Live 2026 server | Where packages outside the built-in bundle are fetched from (only file names are sent) |
+| `ctanMirror` | `https://ftp.fau.de/ctan` | CTAN mirror for TeX Live packages `remoteEndpoint` lacks (whole package archives, cached) |
 | `engine.maxPasses` | 5 | TeX passes per compile at most |
 | `engine.biberArgs` | `--output-safechars` | Works around an encoding bug in the WASM biber |
 | `engine.maxProjects` | 4 | Projects kept in engine memory |
@@ -79,19 +80,19 @@ The popup lists every setting with its current value. Defaults live in
 
 ## Limitations
 
-- **Fonts picked by family name** in XeLaTeX/LuaLaTeX (`\setmainfont{Fira Sans}`): fonts outside the built-in
-  bundle are looked up in an index of TeX Live's fonts and fetched from `remoteEndpoint`. The first compile per
-  browser session then takes 15–30 s, because the engine scans and converts the fonts. If the package server
-  doesn't have a font (e.g. Source Sans 3, Roboto), the project is compiled **on the server** instead
-  (`serverOnMissingFonts`), with a notice saying which fonts are missing.
+- **Packages and fonts outside the built-in bundle** are fetched on first use: from `remoteEndpoint`, and if
+  that doesn't have them (~8% of TeX Live), as their TeX Live package from the CTAN mirror (`ctanMirror`).
+  Both are cached. Fonts picked by family name (`\setmainfont{Source Sans 3}`) are found through an index of
+  TeX Live's fonts. The first compile that needs new fonts takes 15–30 s, because the engine scans and
+  converts them.
+- What can't be provided locally at all (e.g. `kaobook`, which isn't in TeX Live) makes the project compile
+  **on the server** instead (`serverOnMissingPackages` / `serverOnMissingFonts`), with a notice saying what was missing.
 - **biber:** with non-ASCII names, alphabetic labels (`style=alphabetic`) can come out garbled
   (an upstream WASM biber bug). Everything else is fine with the default `--output-safechars`.
 - **Not supported locally** (compiles on the server instead): the `latex` (DVI) compiler, `-shell-escape`
   packages like `minted`, and `makeglossaries`.
-- The first time each package outside the bundle is used, it is downloaded from `remoteEndpoint`.
-  Some packages are missing there (for example `kaobook`). A project that needs one is compiled **on the
-  server** instead (`serverOnMissingPackages`), with a notice. A missing file of your own (a typo in `\input`)
-  isn't treated that way, because the server would fail on it too.
+- A missing file of your own (a typo in `\input`) doesn't trigger the server fallback, because the server
+  would fail on it too.
 - If the project's TeX Live image on the server isn't TeX Live 2026, a notice says the output can differ slightly.
 - You show up twice in the "online users" list, because the extension's connection counts as a second tab.
 

@@ -8,6 +8,8 @@ import { ROOT } from '../../scripts/lib.mjs'
 const HERE = join(ROOT, 'test/unit')
 const OUT = join(HERE, '.build')
 const tests = readdirSync(HERE).filter(f => f.endsWith('.test.ts'))
-await build({ entryPoints: tests.map(t => join(HERE, t)), bundle: true, platform: 'node', format: 'esm', outdir: OUT, outExtension: { '.js': '.mjs' }, logLevel: 'warning' })
+await build({ entryPoints: tests.map(t => join(HERE, t)), bundle: true, platform: 'node', format: 'esm', outdir: OUT, outExtension: { '.js': '.mjs' }, logLevel: 'warning',
+  // some dependencies are UMD bundles that call require() (e.g. xz-decompress → "stream/web")
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" } })
 const r = spawnSync(process.execPath, ['--test', ...tests.map(t => join(OUT, t.replace(/\.ts$/, '.mjs')))], { stdio: 'inherit' })
 process.exit(r.status ?? 1)

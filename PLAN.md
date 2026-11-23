@@ -318,10 +318,14 @@ and later maybe `NativeBackend` (native messaging). The router picks one based o
 
 ### Open issues
 
-- Packages missing on the TeXlyre endpoint (e.g. `kaobook.cls` 404) and fonts it lacks (Source Sans 3, Roboto):
-  self-host a TeX Live 2026 endpoint (texlyre-busytex-build), or fetch from a CTAN mirror in the extension.
+- ✅ Files missing on the TeXlyre endpoint (~8% of a random TeX Live sample, incl. fonts like Source Sans 3 and
+  Roboto) now come from their TeX Live package on a CTAN mirror (`ctanMirror`; file→package index
+  `config/texlive-files.json.gz` from tlpdb; xz + tar in the worker; IndexedDB cache). Awesome-CV compiles
+  locally now. Only files outside TeX Live (e.g. `kaobook`) still fall back to the server.
 - biber-wasm: garbled alphabetic labels for names built from accent macros (upstream bug, worked around otherwise).
 - The first compile with non-bundled fonts takes 15–30 s per browser session (luaotfload rescan in WASM).
+- Intermittent "TeX capacity exceeded [token memory]" in the LuaTeX pass right after fetching fonts/packages
+  (WASM only, ~1 in 3 runs of Awesome-CV). Worked around by re-running that pass once; root cause not found.
 
 ## 7. Decisions (answered 2026-11-22)
 

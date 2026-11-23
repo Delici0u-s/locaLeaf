@@ -15,6 +15,8 @@ export interface EngineSettings {
   maxProjects: number
   /** Fetch fonts that fontspec asks for by name (see config/font-index.json). */
   fetchMissingFonts: boolean
+  /** Fetch TeX Live packages from the CTAN mirror when the bundle and remoteEndpoint lack a file. */
+  fetchFromCtan: boolean
 }
 
 export interface InitMessage {
@@ -24,6 +26,10 @@ export interface InitMessage {
   remoteEndpoint: string
   /** URL of config/font-index.json in the extension. */
   fontIndexUrl: string
+  /** URL of config/texlive-files.json.gz (file → TeX Live package) in the extension. */
+  texliveIndexUrl: string
+  /** CTAN mirror root (…/systems/texlive/tlnet/archive/ is below it). */
+  ctanMirror: string
   settings: EngineSettings
 }
 

@@ -28,7 +28,8 @@
     "$biberArgs": "--output-safechars works around a biber-wasm bug: non-ASCII from LaTeX macros (e.g. {\\\"u}) is emitted decomposed and double UTF-8 encoded, which LaTeX rejects (U+0088). Remaining glitch: alphabetic labels (labelalpha) with such names stay garbled.",
     "maxProjects": 4,
     "$maxProjects": "Projects whose files the engine keeps in memory between compiles (least recently used ones are dropped and re-sent when needed).",
-    "fetchMissingFonts": true
+    "fetchMissingFonts": true,
+    "fetchFromCtan": true
   },
   "keepBuilds": 3,
   "barrierTimeoutMs": 3000,
@@ -51,5 +52,7 @@
   "maxRetryAfterMs": 30000,
   "$maxRetryAfterMs": "Longest Retry-After (server rate limit) the extension waits for before giving up on a download.",
   "serverOnMissingPackages": true,
-  "$serverOnMissingPackages": "If the document needs TeX Live files the engine can't get (e.g. a class missing on remoteEndpoint), compile on the server instead. Missing project files (typos) don't count."
+  "$serverOnMissingPackages": "If the document needs TeX Live files the engine can't get (e.g. a class missing on remoteEndpoint), compile on the server instead. Missing project files (typos) don't count.",
+  "ctanMirror": "https://ftp.fau.de/ctan",
+  "$ctanMirror": "CTAN mirror for TeX Live packages that neither the bundle nor remoteEndpoint has (…/systems/texlive/tlnet/archive/<pkg>.tar.xz). The extension asks for access to it when you enable a site."
 }

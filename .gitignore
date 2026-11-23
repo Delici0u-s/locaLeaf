@@ -9,3 +9,4 @@ dist/
 test/engine/.build/
 test/unit/.build/
 test/.artifacts/
+test/.cache/

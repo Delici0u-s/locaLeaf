@@ -39,7 +39,9 @@ function renderSite(origin: string | null, enabled: boolean, origins: string[], 
     text.textContent = `Compile ${origin} projects locally instead of on the server.`
     button.textContent = 'Enable on this site'
     button.onclick = async () => {
-      const granted = await chrome.permissions.request({ origins: [`${origin}/*`] })
+      // The CTAN mirror too: the engine fetches TeX Live packages the bundle doesn't have from it.
+      const mirror = new URL(mergeSettings(await getStored('settings')).ctanMirror).origin
+      const granted = await chrome.permissions.request({ origins: [`${origin}/*`, `${mirror}/*`] })
       if (!granted) return
       await chrome.storage.local.set({ [STORAGE_KEYS.origins]: [...origins, origin] })
       if (tabId !== undefined) chrome.tabs.reload(tabId)

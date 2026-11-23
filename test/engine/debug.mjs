@@ -16,7 +16,7 @@ const HERE = join(ROOT, 'test/engine')
 const engineCfg = readJson('config/engine.json')
 const defaults = readJson('config/settings.defaults.json')
 await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', outfile: join(HERE, '.build/engine-worker.js'), logLevel: 'warning' })
-const server = await serve({ '/config/': join(ROOT, 'config'), '/build/': join(HERE, '.build'), '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/project/': dir, '/page/': HERE })
+const server = await serve({ '/ctan/': { proxy: defaults.ctanMirror, cacheDir: join(ROOT, 'test/.cache/ctan') }, '/config/': join(ROOT, 'config'), '/build/': join(HERE, '.build'), '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/project/': dir, '/page/': HERE })
 const { context, close } = await launch()
 try {
   const page = await context.newPage()
@@ -25,7 +25,7 @@ try {
   await page.waitForFunction(() => window.engineReady)
   await page.evaluate(o => window.engine.init(o), {
     basePath: '/vendor/busytex', bundles: engineCfg.bundles,
-    remoteEndpoint: overrides.remoteEndpoint ?? defaults.remoteEndpoint, fontIndexUrl: '/config/font-index.json', settings: { ...defaults.engine, ...overrides.engine },
+    remoteEndpoint: overrides.remoteEndpoint ?? defaults.remoteEndpoint, fontIndexUrl: '/config/font-index.json', texliveIndexUrl: '/config/texlive-files.json.gz', ctanMirror: `${server.origin}/ctan`, settings: { ...defaults.engine, ...overrides.engine },
   })
   const list = d => readdirSync(d).flatMap(n => statSync(join(d, n)).isDirectory() ? list(join(d, n)).map(p => `${n}/${p}`) : [n])
   await page.evaluate(([f]) => window.engine.sync('debug', f, { reset: true }), [list(dir).map(p => ({ path: p, url: `/project/${p}` }))])

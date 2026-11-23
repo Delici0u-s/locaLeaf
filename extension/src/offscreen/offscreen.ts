@@ -6,6 +6,7 @@ import type { FromWorker, ToWorker } from '../engine/protocol'
 
 interface EngineConfig {
   idleMinutes: number
+  ctanMirror: string
   basePath: string
   bundles: string[]
   remoteEndpoint: string
@@ -42,7 +43,7 @@ function startWorker() {
     pending = null
     p?.reject(new Error(`engine worker crashed: ${e.message}`))
   }
-  ready = call({ type: 'init', basePath: config.basePath, bundles: config.bundles, remoteEndpoint: config.remoteEndpoint, fontIndexUrl: chrome.runtime.getURL('font-index.json'), settings: config.engine }).then(() => undefined)
+  ready = call({ type: 'init', basePath: config.basePath, bundles: config.bundles, remoteEndpoint: config.remoteEndpoint, fontIndexUrl: chrome.runtime.getURL('font-index.json'), texliveIndexUrl: chrome.runtime.getURL('texlive-files.json.gz'), ctanMirror: config.ctanMirror, settings: config.engine }).then(() => undefined)
 }
 
 function call(msg: ToWorker, transfer: Transferable[] = []): Promise<FromWorker> {

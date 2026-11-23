@@ -2,6 +2,7 @@
 // Classic worker (busytex's scripts use importScripts). One instance serves all projects; each project
 // keeps its files in the in-memory FS between compiles, so recompiles only write what changed.
 import type { CompileMessage, CompileResult, EngineSettings, FromWorker, SyncMessage, ToWorker } from './protocol'
+import { kpseFormat, packageFiles } from './ctan'
 import { applyDraft, bibtexKey, countErrors, dirname, extname, fontKey, hashBytes, joinPath, missingFiles, missingFonts, missingPackages, sameSnapshot } from './latexmk'
 
 // Typed loosely: the project compiles with the DOM lib, not WebWorker.
@@ -33,6 +34,12 @@ let settings: EngineSettings
 let remoteEndpoint = ''
 let fontIndexUrl = ''
 let fontIndex: Promise<{ names: Record<string, string[]> } | null> | null = null
+let ctanMirror = ''
+let texliveIndexUrl = ''
+let texliveIndex: Promise<Record<string, string> | null> | null = null
+/** TeX Live packages already fetched from CTAN and registered with kpathsea (per worker lifetime). */
+const ctanPackages = new Map<string, Promise<TarEntryLike[]>>()
+type TarEntryLike = { path: string; bytes: Uint8Array }
 const projects = new Map<string, ProjectState>()
 
 const post = (msg: FromWorker, transfer: Transferable[] = []) => self.postMessage(msg, transfer)
@@ -43,6 +50,8 @@ self.onmessage = async ({ data }: MessageEvent<ToWorker>) => {
   try {
     if (data.type === 'init') {
       fontIndexUrl = data.fontIndexUrl
+      texliveIndexUrl = data.texliveIndexUrl
+      ctanMirror = data.ctanMirror
       await init(data.basePath, data.bundles, data.remoteEndpoint, data.settings)
     }
     else if (data.type === 'sync') sync(data)
@@ -200,14 +209,27 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   let halted = false
   let fonts: string[] = []
   const triedFonts = new Set<string>()
+  const triedFiles = new Set<string>()
+  let retriedCapacity = false
   for (let pass = 0; pass < settings.maxPasses; pass++) {
     const before = watchSnapshot(root)
     run(texCmd)
-    const log = readText(out('log'))
+    let log = readText(out('log'))
+    // Right after fetching fonts/packages, a LuaTeX pass occasionally dies with "TeX capacity exceeded" in this
+    // WASM build (not reproducible natively). Running the pass again succeeds; a repeat is a real error.
+    if (/^! TeX capacity exceeded/m.test(log) && !retriedCapacity) {
+      retriedCapacity = true
+      post({ type: 'print', text: 'TeX capacity exceeded: running the pass again' })
+      run(texCmd)
+      log = readText(out('log'))
+    }
     fonts = missingFonts(log)
     const fetched = settings.fetchMissingFonts && msg.compiler !== 'pdflatex' ? await fetchFonts(fonts.filter(f => !triedFonts.has(f)), outDir) : 0
     fonts.forEach(f => triedFonts.add(f))
     if (fetched > 0) continue // the fonts are in place now: run again
+    const missing = missingPackages(missingFiles(log), st.sources.keys()).filter(f => !triedFiles.has(f))
+    missing.forEach(f => triedFiles.add(f))
+    if (settings.fetchFromCtan && (await provideFromCtan(missing)) > 0) continue
     if (msg.stopOnFirstError && countErrors(log) > 0) {
       halted = true
       break
@@ -264,39 +286,85 @@ async function fetchFonts(names: string[], outDir: string): Promise<number> {
   return added
 }
 
-/** A font file from the package server, cached in the extension's IndexedDB across sessions. */
+/** A font file from the package server, else from its TeX Live package on CTAN; cached across sessions. */
 async function fontBytes(file: string): Promise<Uint8Array | null> {
-  const key = `${remoteEndpoint}/${file}`
-  const cached = await idb('get', key)
-  if (cached) return new Uint8Array(cached as ArrayBuffer)
   const format = /\.otf$/i.test(file) ? 47 : 36 // kpathsea: opentype / truetype
-  try {
-    const res = await fetch(`${remoteEndpoint}/${format}/${encodeURIComponent(file)}`)
-    if (!res.ok) return null
-    const buf = await res.arrayBuffer()
-    await idb('put', key, buf)
-    return new Uint8Array(buf)
-  } catch {
-    return null
-  }
+  const buf = await cached(`font:${remoteEndpoint}/${file}`, async () => {
+    try {
+      const res = await fetch(`${remoteEndpoint}/${format}/${encodeURIComponent(file)}`)
+      return res.ok ? res.arrayBuffer() : null
+    } catch {
+      return null
+    }
+  })
+  if (buf) return new Uint8Array(buf)
+  if (!settings.fetchFromCtan) return null
+  const pkg = (await loadTexliveIndex())?.[file]
+  const entry = pkg ? (await ctanPackage(pkg)).find(e => e.path.endsWith(`/${file}`)) : undefined
+  return entry?.bytes ?? null
 }
 
-let fontDb: Promise<IDBDatabase | null> | null = null
-async function idb(op: 'get' | 'put', key: string, value?: ArrayBuffer): Promise<unknown> {
-  fontDb ??= new Promise(resolve => {
-    const req = indexedDB.open('olr-fonts', 1)
-    req.onupgradeneeded = () => req.result.createObjectStore('fonts')
+function loadTexliveIndex(): Promise<Record<string, string> | null> {
+  texliveIndex ??= fetch(texliveIndexUrl)
+    .then(r => (r.ok ? new Response(r.body!.pipeThrough(new DecompressionStream('gzip'))).json() : null))
+    .then(j => j?.files ?? null, () => null)
+  return texliveIndex
+}
+
+function ctanPackage(pkg: string): Promise<TarEntryLike[]> {
+  let p = ctanPackages.get(pkg)
+  if (!p) {
+    p = packageFiles(ctanMirror, pkg, cached).then(entries => {
+      for (const e of entries) {
+        const name = e.path.slice(e.path.lastIndexOf('/') + 1)
+        Module.kpse_remote_register(name, kpseFormat(name), e.bytes)
+      }
+      post({ type: 'print', text: `ctan: ${pkg} (${entries.length} files)` })
+      return entries
+    }, () => [])
+    ctanPackages.set(pkg, p)
+  }
+  return p
+}
+
+/** Fetches the TeX Live packages that contain these files. Returns how many packages were added. */
+async function provideFromCtan(files: string[]): Promise<number> {
+  if (!files.length || !ctanMirror) return 0
+  const index = await loadTexliveIndex()
+  if (!index) return 0
+  const pkgs = new Set(files.map(f => index[f] ?? index[`${f}.tex`]).filter((p): p is string => !!p && !ctanPackages.has(p)))
+  const results = await Promise.all([...pkgs].map(p => ctanPackage(p)))
+  return results.filter(r => r.length > 0).length
+}
+
+let cacheDb: Promise<IDBDatabase | null> | null = null
+/** IndexedDB-backed cache in the extension origin (fonts, CTAN archives). */
+async function cached(key: string, load: () => Promise<ArrayBuffer | null>): Promise<ArrayBuffer | null> {
+  cacheDb ??= new Promise(resolve => {
+    const req = indexedDB.open('olr-engine-cache', 1)
+    req.onupgradeneeded = () => req.result.createObjectStore('files')
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => resolve(null)
   })
-  const db = await fontDb
-  if (!db) return null
-  return new Promise(resolve => {
-    const tx = db.transaction('fonts', op === 'get' ? 'readonly' : 'readwrite')
-    const req = op === 'get' ? tx.objectStore('fonts').get(key) : tx.objectStore('fonts').put(value, key)
-    req.onsuccess = () => resolve(req.result)
+  const db = await cacheDb
+  const get = () => new Promise<ArrayBuffer | null>(resolve => {
+    if (!db) return resolve(null)
+    const req = db.transaction('files').objectStore('files').get(key)
+    req.onsuccess = () => resolve(req.result ?? null)
     req.onerror = () => resolve(null)
   })
+  const hit = await get()
+  if (hit) return hit
+  const value = await load()
+  if (value && db) {
+    await new Promise<void>(resolve => {
+      const tx = db.transaction('files', 'readwrite')
+      tx.objectStore('files').put(value, key)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => resolve()
+    })
+  }
+  return value
 }
 
 function buildTexCommand(msg: CompileMessage): string[] {

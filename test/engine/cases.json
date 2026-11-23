@@ -81,13 +81,25 @@
       }
     },
     {
+      "name": "ctan-package",
+      "project": "ctan-package",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "success",
+        "errors": 0,
+        "missingPackages": "none"
+      }
+    },
+    {
       "name": "missing-package",
       "project": "missing-package",
       "main": "main.tex",
       "compiler": "pdflatex",
       "expect": {
         "missingPackages": "some"
-      }
+      },
+      "$note": "kaobook isn't in TeX Live at all (not on CTAN's tlnet either): must be reported."
     },
     {
       "name": "missing-input-typo",
@@ -134,9 +146,10 @@
       "fixture": "awesome-cv",
       "expect": {
         "status": "success",
-        "missingFonts": "some"
+        "errors": 0,
+        "missingFonts": "none"
       },
-      "$note": "Source Sans 3 / Roboto aren't on the package server: the engine must report them so the page compiles on the server instead."
+      "$note": "Source Sans 3 / Roboto aren't on the package server; they come from their TeX Live packages on CTAN."
     }
   ]
 }

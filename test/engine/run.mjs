@@ -19,7 +19,7 @@ const cases = readJson('test/engine/cases.json').cases.filter(c => !filters.leng
 
 await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', outfile: join(BUILD, 'engine-worker.js'), target: 'chrome120', logLevel: 'warning' })
 
-const server = await serve({ '/config/': join(ROOT, 'config'), '/build/': BUILD, '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/fixtures/': join(ROOT, 'bench/fixtures'), '/projects/': join(HERE, 'projects'), '/page/': HERE })
+const server = await serve({ '/ctan/': { proxy: defaults.ctanMirror, cacheDir: join(ROOT, 'test/.cache/ctan') }, '/config/': join(ROOT, 'config'), '/build/': BUILD, '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/fixtures/': join(ROOT, 'bench/fixtures'), '/projects/': join(HERE, 'projects'), '/page/': HERE })
 const { context, close } = await launch()
 h.onCleanup(close)
 const page = await context.newPage()
@@ -39,7 +39,7 @@ const results = []
 let failed = 0
 try {
   const init = await page.evaluate(o => window.engine.init(o), {
-    basePath: '/vendor/busytex', bundles: engineCfg.bundles, remoteEndpoint: defaults.remoteEndpoint, fontIndexUrl: '/config/font-index.json', settings: defaults.engine,
+    basePath: '/vendor/busytex', bundles: engineCfg.bundles, remoteEndpoint: defaults.remoteEndpoint, fontIndexUrl: '/config/font-index.json', texliveIndexUrl: '/config/texlive-files.json.gz', ctanMirror: `${server.origin}/ctan`, settings: defaults.engine,
   })
   h.step(`engine ready in ${(init.ms / 1000).toFixed(1)}s`)
 
