@@ -1,6 +1,7 @@
 // Builds the extension into dist/ (load it unpacked from there).
-// env: OLR_DEV_ORIGINS="http://localhost:8090,..." also grants and injects into those origins statically
-//      (for local development and the e2e tests, where no one can click the permission prompt).
+// Sites built in: the Overleaf addresses in localeaf.local.json ({"sites": ["https://overleaf.example.com"]},
+// git-ignored) or LOCALEAF_SITES="https://a,https://b" are granted and injected statically, so no permission
+// prompt is needed (some browsers never show it; the e2e tests can't click it). The CTAN mirror is added too.
 import { cpSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -12,7 +13,13 @@ const DIST = join(ROOT, process.env.OLR_DIST_DIR ?? 'dist')
 const SRC = join(ROOT, 'extension/src')
 const engine = readJson('config/engine.json')
 const pkg = readJson('package.json')
-const devOrigins = (process.env.OLR_DEV_ORIGINS ?? '').split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean)
+const LOCAL_CONFIG = join(ROOT, 'localeaf.local.json')
+const localConfig = existsSync(LOCAL_CONFIG) ? JSON.parse(readFileSync(LOCAL_CONFIG, 'utf8')) : {}
+const builtInSites = (process.env.LOCALEAF_SITES !== undefined ? process.env.LOCALEAF_SITES.split(',') : localConfig.sites ?? [])
+  .map(s => s.trim()).filter(Boolean).map(s => new URL(s).origin)
+// "anySite": true grants access to all sites up front, so "Enable on this site" in the popup never needs a
+// permission prompt. LocaLeaf still only runs on the sites you enable.
+const anySite = process.env.LOCALEAF_ANY_SITE !== undefined ? process.env.LOCALEAF_ANY_SITE === '1' : localConfig.anySite === true
 
 const vendor = join(ROOT, engine.vendorDir)
 if (!existsSync(join(vendor, '.version'))) {
@@ -59,15 +66,19 @@ for (const [size, rel] of Object.entries(manifest.icons ?? {})) {
   }
 }
 manifest.version = pkg.version ?? manifest.version
-if (devOrigins.length) {
+if (builtInSites.length) {
   const mirror = new URL(readJson('config/settings.defaults.json').ctanMirror).origin
-  manifest.host_permissions = [...(manifest.host_permissions ?? []), ...devOrigins.map(o => `${o}/*`), `${mirror}/*`]
-  const matches = devOrigins.map(o => `${o}/project/*`)
+  manifest.host_permissions = [...(manifest.host_permissions ?? []), ...builtInSites.map(o => `${o}/*`), `${mirror}/*`]
+  const matches = builtInSites.map(o => `${o}/project/*`)
   manifest.content_scripts = [
     { matches, js: ['page.js'], run_at: 'document_start', world: 'MAIN' },
     { matches, js: ['content.js'], run_at: 'document_start' },
   ]
-  console.log(`dev origins: ${devOrigins.join(', ')}`)
+  console.log(`built-in sites: ${builtInSites.join(', ')}`)
+}
+if (anySite) {
+  manifest.host_permissions = [...new Set([...(manifest.host_permissions ?? []), 'https://*/*', 'http://*/*'])]
+  console.log('anySite: access to all sites granted up front (LocaLeaf only runs where you enable it)')
 }
 writeFileSync(join(DIST, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 console.log(`built ${DIST}`)

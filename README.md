@@ -23,6 +23,23 @@ npm run assets      # downloads the TeX engine + TeX Live bundle (~500 MB, once)
 npm run build       # → dist/
 ```
 
+**Your Overleaf address (recommended):** put it in `localeaf.local.json` before building. LocaLeaf is then enabled
+there from the start, and the browser never has to show a permission prompt (Brave sometimes doesn't):
+
+```json
+{ "sites": ["https://overleaf.example.com"] }
+```
+
+Or let the popup's **Enable on this site** work without any prompt, on whatever site you're on:
+
+```json
+{ "anySite": true }
+```
+
+This grants site access for all sites when the extension loads, but LocaLeaf still only runs on the sites
+you enable in the popup. Without the file, the popup asks the browser for access, which some Brave setups
+never show.
+
 Then in Brave (Chrome works the same way, under `chrome://extensions`):
 
 1. Open `brave://extensions`.
@@ -44,6 +61,20 @@ and reload the Overleaf tab.
 Per project you can switch between compiling *locally* and *on the server* in the popup.
 The first compile after opening a project takes a few seconds longer, because the extension
 loads the whole project and starts the engine. After that, recompiles only process what changed.
+
+## What goes over the network
+
+Compiling is local: your documents never leave the browser except to your Overleaf server, exactly as before.
+The extension ships TeX Live 2026's "recommended" collection (~200 MB). A document that needs a package or font
+outside it gets that **file** downloaded once and cached:
+
+1. from `remoteEndpoint` (TeXlyre's TeX Live 2026 file server). The request contains only the file name, e.g.
+   `26/IEEEtran.cls`.
+2. if that server doesn't have it, from `ctanMirror`, which serves the whole TeX Live package (e.g. `gradbars.tar.xz`).
+
+To keep everything on your machine: set `remoteEndpoint` to empty and `engine.fetchFromCtan` to off in the popup.
+Projects that need something outside the bundle then compile on your Overleaf server instead. To need fewer
+downloads, add `"texlive-extra"` to `bundles` in `config/engine.json` (+340 MB) and rebuild.
 
 ## How it works
 

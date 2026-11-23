@@ -7,7 +7,8 @@
     "engine": 1800000,
     "default": 600000,
     "e2e-history-ot": 600000,
-    "e2e-stop": 600000
+    "e2e-stop": 600000,
+    "e2e-any-site": 300000
   },
   "step": {
     "default": 180000,

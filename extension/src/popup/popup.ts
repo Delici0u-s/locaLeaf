@@ -10,16 +10,33 @@ async function main() {
   const origin = url && /^https?:$/.test(url.protocol) ? url.origin : null
   const projectId = url?.pathname.match(/^\/project\/([^/]+)/)?.[1] ?? null
   const origins = await getStored('origins')
-  const enabled = !!origin && origins.includes(origin)
+  const builtIn = builtInSites()
+  const enabled = !!origin && (origins.includes(origin) || builtIn.includes(origin))
 
-  renderSite(origin, enabled, origins, tab?.id)
+  renderSite(origin, enabled, origins, tab?.id, !!origin && builtIn.includes(origin))
   if (enabled) await renderMirrorAccess()
   if (enabled && projectId) await renderProject(projectId, tab?.id)
   renderEngine()
   await renderSettings()
 }
 
-function renderSite(origin: string | null, enabled: boolean, origins: string[], tabId?: number) {
+/** True if the extension can access these origins, asking the browser only when it can't yet. */
+async function ensureAccess(origins: string[]): Promise<boolean> {
+  if (await chrome.permissions.contains({ origins })) return true
+  try {
+    return await chrome.permissions.request({ origins })
+  } catch {
+    return false
+  }
+}
+
+/** Sites granted in the manifest at build time (localeaf.local.json): always on, no prompt needed. */
+function builtInSites(): string[] {
+  const matches = (chrome.runtime.getManifest().content_scripts ?? []).flatMap(c => c.matches ?? [])
+  return [...new Set(matches.map(m => m.replace(/\/project\/\*$/, '')))]
+}
+
+function renderSite(origin: string | null, enabled: boolean, origins: string[], tabId?: number, builtIn = false) {
   const el = $('site')
   if (!origin) {
     el.innerHTML = '<p class="muted">Open an Overleaf project to enable local compiling there.</p>'
@@ -28,6 +45,11 @@ function renderSite(origin: string | null, enabled: boolean, origins: string[], 
   const button = document.createElement('button')
   const text = document.createElement('p')
   text.className = 'muted'
+  if (builtIn) {
+    text.textContent = `Enabled on ${origin} (built in via localeaf.local.json).`
+    el.replaceChildren(text)
+    return
+  }
   if (enabled) {
     text.textContent = `Enabled on ${origin}.`
     button.textContent = 'Disable on this site'
@@ -42,8 +64,11 @@ function renderSite(origin: string | null, enabled: boolean, origins: string[], 
     button.onclick = async () => {
       // The CTAN mirror too: the engine fetches TeX Live packages the bundle doesn't have from it.
       const mirror = new URL(mergeSettings(await getStored('settings')).ctanMirror).origin
-      const granted = await chrome.permissions.request({ origins: [`${origin}/*`, `${mirror}/*`] })
-      if (!granted) return
+      if (!(await ensureAccess([`${origin}/*`, `${mirror}/*`]))) {
+        text.textContent = `The browser didn't grant access to ${origin}. Some browsers (Brave) don't show the prompt: ` +
+          'add "anySite": true (or this site) to localeaf.local.json, run npm run build and reload LocaLeaf.'
+        return
+      }
       await chrome.storage.local.set({ [STORAGE_KEYS.origins]: [...origins, origin] })
       if (tabId !== undefined) chrome.tabs.reload(tabId)
       window.close()
@@ -62,7 +87,8 @@ async function renderMirrorAccess() {
   const button = document.createElement('button')
   button.textContent = 'Allow access to the mirror'
   button.onclick = async () => {
-    if (await chrome.permissions.request({ origins: [`${mirror}/*`] })) { p.remove(); button.remove() }
+    if (await ensureAccess([`${mirror}/*`])) { p.remove(); button.remove() }
+    else p.textContent = `The browser didn't grant access to ${mirror} (see localeaf.local.json in the README).`
   }
   $('site').append(p, button)
 }

@@ -1,5 +1,5 @@
 // End-to-end test: the built extension (dist/) in Brave against a local Overleaf CE (dev/overleaf-ce).
-// Prereqs: docker compose -f dev/overleaf-ce/compose.yml up -d; OLR_DEV_ORIGINS=<overleaf url> npm run build
+// Prereqs: docker compose -f dev/overleaf-ce/compose.yml up -d; npm run build:test
 // Usage: node test/e2e/run.mjs
 import { join } from 'node:path'
 import { ROOT } from '../../scripts/lib.mjs'

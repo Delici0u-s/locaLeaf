@@ -11,3 +11,5 @@ test/unit/.build/
 test/.artifacts/
 test/.cache/
 dist-test/
+localeaf.local.json
+dist-anysite/
