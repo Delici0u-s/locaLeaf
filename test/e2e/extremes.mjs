@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { deflateSync, crc32 } from 'node:zlib'
 import { ROOT } from '../../scripts/lib.mjs'
-import { launch } from '../lib/browser.mjs'
+import { EXTENSION_DIR, launch } from '../lib/browser.mjs'
 import { OVERLEAF_URL, ensureAdmin, login, uploadProject } from './overleaf.mjs'
 import { harness, preflight } from '../lib/harness.mjs'
 
@@ -65,12 +65,12 @@ const check = async (name, ok, detail = '') => {
   if (ok) return
   failures++
   // What the extension saw: the last local compile's errors.
-  const last = page ? await page.evaluate(() => window.__overleafLocalRender?.lastCompile()).catch(() => null) : null
+  const last = page ? await page.evaluate(() => window.__localeaf?.lastCompile()).catch(() => null) : null
   if (last) h.step(`  last compile: ${last.status}, ${last.errors} errors\n    ${last.log.split('\n').filter(l => l.startsWith('!')).slice(0, 5).join('\n    ')}`)
   await h.saveArtifacts(`check failed: ${name}`)
 }
 
-const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
+const { context, close } = await launch({ extensionDir: EXTENSION_DIR })
 h.onCleanup(close)
 context.setDefaultTimeout(h.stepMs)
 const serverCompiles = []
@@ -91,9 +91,9 @@ try {
 
   page = await context.newPage()
   const all = h.track('editor', page)
-  const ours = () => all.filter(l => l.includes('[overleaf-local-render]'))
+  const ours = () => all.filter(l => l.includes('[localeaf]'))
   // Our own log lines are also echoed live, so a hang shows where it stopped.
-  page.on('console', m => { if (m.text().includes('[overleaf-local-render]')) h.step(`  page: ${m.text().replace('[overleaf-local-render] ', '').slice(0, 160)}`) })
+  page.on('console', m => { if (m.text().includes('[localeaf]')) h.step(`  page: ${m.text().replace('[localeaf] ', '').slice(0, 160)}`) })
   const waitLog = from => h.waitFor('a compile result in the page log', () => ours().slice(from).find(l => /compiled .* locally|local compile failed/.test(l)))
   // Only rendered pages have a text layer: jump to the first or last page, then look.
   const pdfHas = (text, where = 'start') => h.waitFor(`"${text}" in the PDF text (${where})`, async () => {

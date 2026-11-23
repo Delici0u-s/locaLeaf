@@ -5,7 +5,7 @@ import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ROOT, readJson } from '../../scripts/lib.mjs'
-import { launch } from '../lib/browser.mjs'
+import { EXTENSION_DIR, launch } from '../lib/browser.mjs'
 import { OVERLEAF_URL, ensureAdmin, login, setProjectSettings, uploadProject } from './overleaf.mjs'
 import { harness, preflight } from '../lib/harness.mjs'
 
@@ -30,7 +30,7 @@ function uploadCopy(fx) {
   return dir
 }
 
-const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
+const { context, close } = await launch({ extensionDir: EXTENSION_DIR })
 h.onCleanup(close)
 context.setDefaultTimeout(TIMEOUT)
 const serverCompiles = []
@@ -54,7 +54,7 @@ try {
     h.track(fx.name, page)
     h.step(`fixture ${fx.name}: opening`)
     const lines = []
-    page.on('console', m => { if (m.text().includes('[overleaf-local-render]')) lines.push(m.text()) })
+    page.on('console', m => { if (m.text().includes('[localeaf]')) lines.push(m.text()) })
     const waitLog = async from => {
       const t0 = Date.now()
       for (;;) {

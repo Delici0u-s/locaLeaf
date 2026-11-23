@@ -5,6 +5,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
+import { ROOT } from '../../scripts/lib.mjs'
+
+/** The extension build the tests load (npm run build:test). */
+export const EXTENSION_DIR = process.env.OLR_TEST_EXTENSION_DIR ?? join(ROOT, 'dist-test')
 
 const CANDIDATES = ['brave-browser', 'brave', 'chromium', 'chromium-browser', 'google-chrome']
 

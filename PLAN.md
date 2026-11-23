@@ -1,4 +1,4 @@
-# Overleaf local render: plan
+# LocaLeaf: plan
 
 Goal: while the Overleaf editor is open in Chrome or Brave (on a slow self-hosted server), clicking
 **Recompile** (or an auto-compile) compiles the project **on this machine**. Preferably that happens

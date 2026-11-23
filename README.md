@@ -1,4 +1,4 @@
-# Overleaf local render
+# LocaLeaf
 
 A Chrome/Brave extension that compiles your Overleaf projects **on your own machine** and shows
 the result in Overleaf's normal PDF preview. Useful when the Overleaf server is slow. You still edit
@@ -15,14 +15,23 @@ It is built and tested against Overleaf **Community Edition**.
 
 ## Install (from source)
 
+Needs Node.js 20+ and ImageMagick (`magick`, for the icons).
+
 ```sh
 npm install
 npm run assets      # downloads the TeX engine + TeX Live bundle (~500 MB, once) into vendor/
 npm run build       # → dist/
 ```
 
-Then open `brave://extensions` (or `chrome://extensions`), turn on **Developer mode** and use
-**Load unpacked** on the `dist/` folder.
+Then in Brave (Chrome works the same way, under `chrome://extensions`):
+
+1. Open `brave://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `dist/` folder.
+4. Optional: pin LocaLeaf in the toolbar (puzzle icon → pin), so you see its badge.
+
+**Updating:** run `npm run build` again, then click the reload arrow on LocaLeaf's card in `brave://extensions`,
+and reload the Overleaf tab.
 
 ## Use
 
@@ -100,7 +109,7 @@ The popup lists every setting with its current value. Defaults live in
 
 ```sh
 docker compose -f dev/overleaf-ce/compose.yml up -d     # local Overleaf CE, see dev/overleaf-ce/README.md
-OLR_DEV_ORIGINS=http://localhost:8090 npm run build     # also injects into that origin without the popup
+npm run build:test                                      # → dist-test/, also injects into the dev Overleaf (no popup)
 npm run typecheck
 npm run test:unit                                       # OT, SyncTeX, rerun logic
 npm run test:engine                                     # TeX engine in a real browser
@@ -115,7 +124,7 @@ Tests launch Brave if it's installed (`OLR_TEST_BROWSER` overrides it, and `OLR_
 Each test script prints timestamped progress and has a hard deadline plus per-step time limits
 (`config/test.json`; override with `OLR_TEST_DEADLINE_MS` / `OLR_TEST_STEP_MS`). When a check fails or a
 deadline passes, screenshots and console logs of the open pages are saved to `test/.artifacts/`, and the script
-exits (code 124 on a deadline). In the browser console, `__overleafLocalRender.lastCompile()` shows the last
+exits (code 124 on a deadline). In the browser console, `__localeaf.lastCompile()` shows the last
 local compile's status and log.
 
 ## License

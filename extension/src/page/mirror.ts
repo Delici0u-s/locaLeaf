@@ -65,7 +65,7 @@ export class ProjectMirror {
     this.log(`mirror ready: ${this.docs.size} docs, ${this.files.size} files`)
   }
 
-  private addFolder(f: Folder, parent: string | null) {
+  addFolder(f: Folder, parent: string | null) {
     this.entities.set(f._id, { id: f._id, name: f.name, kind: 'folder', parent })
     for (const d of f.docs ?? []) this.entities.set(d._id, { id: d._id, name: d.name, kind: 'doc', parent: f._id })
     for (const r of f.fileRefs ?? []) this.entities.set(r._id, { id: r._id, name: r.name, kind: 'file', parent: f._id, hash: r.hash })
@@ -75,24 +75,56 @@ export class ProjectMirror {
   private listen() {
     const s = this.socket
     s.on('otUpdateApplied', (u: { doc: string; v: number; op?: any[] }) => this.onUpdate(u))
-    s.on('reciveNewDoc', (parentId: string, doc: { _id: string; name: string }) => {
-      this.entities.set(doc._id, { id: doc._id, name: doc.name, kind: 'doc', parent: parentId })
-      this.joinDocWithRetry(doc._id).catch(e => this.fail(e))
-    })
-    s.on('reciveNewFile', (parentId: string, file: { _id: string; name: string; hash?: string }) => {
-      const e: Entity = { id: file._id, name: file.name, kind: 'file', parent: parentId, hash: file.hash }
-      this.entities.set(file._id, e)
-      this.fetchFile(e).catch(err => this.fail(err))
-    })
+    s.on('reciveNewDoc', (parentId: string, doc: { _id: string; name: string }) => this.addDoc(parentId, doc))
+    s.on('reciveNewFile', (parentId: string, file: { _id: string; name: string; hash?: string }) => this.addFile(parentId, file))
     s.on('reciveNewFolder', (parentId: string, folder: Folder) => this.addFolder(folder, parentId))
-    s.on('reciveEntityRename', (id: string, name: string) => { const e = this.entities.get(id); if (e) e.name = name })
-    s.on('reciveEntityMove', (id: string, folderId: string) => { const e = this.entities.get(id); if (e) e.parent = folderId })
+    s.on('reciveEntityRename', (id: string, name: string) => this.rename(id, name))
+    s.on('reciveEntityMove', (id: string, folderId: string) => this.move(id, folderId))
     s.on('removeEntity', (id: string) => this.remove(id))
     s.on('compilerUpdated', (c: string) => { this.project.compiler = c })
     s.on('imageNameUpdated', (n: string) => { this.project.imageName = n })
   }
 
-  private remove(id: string) {
+  // File tree changes. Called for the real-time broadcasts and also by the page as soon as Overleaf's own
+  // request for the change succeeds (the broadcast can lag on a busy server); applying one twice is harmless.
+
+  addDoc(parentId: string, doc: { _id: string; name: string }) {
+    if (this.entities.has(doc._id)) return
+    this.entities.set(doc._id, { id: doc._id, name: doc.name, kind: 'doc', parent: parentId })
+    this.track(this.joinDocWithRetry(doc._id))
+  }
+
+  addFile(parentId: string, file: { _id: string; name: string; hash?: string }) {
+    if (this.files.has(file._id) && this.entities.get(file._id)?.hash === file.hash) return
+    const e: Entity = { id: file._id, name: file.name, kind: 'file', parent: parentId, hash: file.hash }
+    this.entities.set(file._id, e)
+    this.track(this.fetchFile(e))
+  }
+
+  rename(id: string, name: string) {
+    const e = this.entities.get(id)
+    if (e) e.name = name
+  }
+
+  move(id: string, folderId: string) {
+    const e = this.entities.get(id)
+    if (e) e.parent = folderId
+  }
+
+  /** Content loads started by tree changes; settle() waits for them. */
+  private loading = new Set<Promise<void>>()
+  private track(p: Promise<void>) {
+    const t = p.catch(e => this.fail(e)).finally(() => this.loading.delete(t))
+    this.loading.add(t)
+  }
+
+  /** Entities Overleaf created (upload) whose broadcast hasn't arrived yet. */
+  private expected = new Set<string>()
+  expect(id: string) {
+    if (!this.entities.has(id)) this.expected.add(id)
+  }
+
+  remove(id: string) {
     for (const e of [...this.entities.values()]) if (e.parent === id) this.remove(e.id)
     this.entities.delete(id)
     this.docs.delete(id)
@@ -209,6 +241,13 @@ export class ProjectMirror {
 
   hasDoc(id: string): boolean {
     return this.docs.has(id)
+  }
+
+  /** Waits (until the deadline) for expected new entities to arrive, then for their content. */
+  async waitForTree(deadline: number): Promise<void> {
+    while ([...this.expected].some(id => !this.entities.has(id)) && performance.now() < deadline) await new Promise(r => setTimeout(r, 20))
+    this.expected.clear()
+    await Promise.all([...this.loading])
   }
 
   /** Fetches every stale history-ot doc now instead of after the debounce. */

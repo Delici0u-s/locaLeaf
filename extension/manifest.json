@@ -1,13 +1,39 @@
 {
   "manifest_version": 3,
-  "name": "Overleaf local render",
+  "name": "LocaLeaf",
   "version": "0.1.0",
   "description": "Compiles Overleaf projects on your machine (TeX Live in WebAssembly) and shows the result in Overleaf's own preview.",
   "minimum_chrome_version": "120",
-  "permissions": ["storage", "unlimitedStorage", "offscreen", "scripting"],
-  "optional_host_permissions": ["https://*/*", "http://*/*"],
-  "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_title": "Overleaf local render", "default_popup": "popup.html" },
+  "icons": {
+    "16": "icons/localeaf-16.png",
+    "32": "icons/localeaf-32.png",
+    "48": "icons/localeaf-48.png",
+    "128": "icons/localeaf-128.png"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "offscreen",
+    "scripting"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "LocaLeaf",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/localeaf-16.png",
+      "32": "icons/localeaf-32.png",
+      "48": "icons/localeaf-48.png",
+      "128": "icons/localeaf-128.png"
+    }
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   }

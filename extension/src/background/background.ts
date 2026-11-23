@@ -95,7 +95,7 @@ chrome.runtime.onMessage.addListener((msg: BackgroundRequest, sender, sendRespon
       if (tabId !== undefined && b) {
         chrome.action.setBadgeText({ tabId, text: b.text })
         chrome.action.setBadgeBackgroundColor({ tabId, color: b.color })
-        chrome.action.setTitle({ tabId, title: `Overleaf local render: ${msg.detail ?? msg.state}` })
+        chrome.action.setTitle({ tabId, title: `LocaLeaf: ${msg.detail ?? msg.state}` })
       }
       sendResponse({ ok: true })
       return false

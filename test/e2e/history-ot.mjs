@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { ROOT } from '../../scripts/lib.mjs'
-import { launch } from '../lib/browser.mjs'
+import { EXTENSION_DIR, launch } from '../lib/browser.mjs'
 import { harness, preflight } from '../lib/harness.mjs'
 import { OVERLEAF_URL, ensureAdmin, login, uploadProject } from './overleaf.mjs'
 
@@ -17,7 +17,7 @@ const check = async (name, ok, detail = '') => {
   if (!ok) { failures++; await h.saveArtifacts(`check failed: ${name}`) }
 }
 
-const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
+const { context, close } = await launch({ extensionDir: EXTENSION_DIR })
 h.onCleanup(close)
 context.setDefaultTimeout(h.stepMs)
 const serverCompiles = []
@@ -47,7 +47,7 @@ try {
   await page.goto(`${OVERLEAF_URL}/project/${projectId}`)
   const first = await compiled(logs, 0)
   await check('compile on load is local', /locally: success/.test(first), first)
-  const types = await page.evaluate(() => window.__overleafLocalRender.docTypes())
+  const types = await page.evaluate(() => window.__localeaf.docTypes())
   await check('docs arrive as history-ot', Object.values(types).length > 0 && Object.values(types).every(t => t === 'history-ot'), JSON.stringify(types))
 
   const n1 = logs.length

@@ -4,7 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ROOT, readJson } from '../../scripts/lib.mjs'
-import { launch } from '../lib/browser.mjs'
+import { EXTENSION_DIR, launch } from '../lib/browser.mjs'
 import { harness, preflight } from '../lib/harness.mjs'
 import { OVERLEAF_URL, ensureAdmin, login, uploadProject } from './overleaf.mjs'
 
@@ -24,7 +24,7 @@ const dir = mkdtempSync(join(tmpdir(), 'olr-e2e-stop-'))
 cpSync(join(ROOT, 'test/e2e/projects/slow'), dir, { recursive: true })
 writeFileSync(join(dir, 'main.tex'), readFileSync(join(dir, 'main.tex'), 'utf8').replace('SPINCOUNT', spin))
 
-const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
+const { context, close } = await launch({ extensionDir: EXTENSION_DIR })
 h.onCleanup(close)
 context.setDefaultTimeout(h.stepMs)
 const serverCompiles = []
@@ -41,7 +41,7 @@ try {
 
   const page = await context.newPage()
   const logs = h.track('editor', page)
-  const ours = () => logs.filter(l => l.includes('[overleaf-local-render]'))
+  const ours = () => logs.filter(l => l.includes('[localeaf]'))
   await page.goto(`${OVERLEAF_URL}/project/${projectId}`)
   h.step('waiting for the slow compile to be running')
   await h.waitFor('the compile to start', () => page.locator('button:has-text("Compiling")').count())

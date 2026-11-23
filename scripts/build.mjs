@@ -3,10 +3,12 @@
 //      (for local development and the e2e tests, where no one can click the permission prompt).
 import { cpSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { build } from 'esbuild'
 import { ROOT, readJson } from './lib.mjs'
 
-const DIST = join(ROOT, 'dist')
+// OLR_DIST_DIR: where to build (the tests use dist-test/, so the dist/ you load in the browser stays untouched)
+const DIST = join(ROOT, process.env.OLR_DIST_DIR ?? 'dist')
 const SRC = join(ROOT, 'extension/src')
 const engine = readJson('config/engine.json')
 const pkg = readJson('package.json')
@@ -43,6 +45,19 @@ for (const name of names) {
 }
 
 const manifest = JSON.parse(readFileSync(join(ROOT, 'extension/manifest.json'), 'utf8'))
+
+// Icons: the manifest lists the PNG sizes; each is rendered from the one SVG (square, centred, transparent).
+const LOGO = join(ROOT, 'extension/icons/localeaf.svg')
+mkdirSync(join(DIST, 'icons'), { recursive: true })
+copyFileSync(LOGO, join(DIST, 'icons/localeaf.svg'))
+for (const [size, rel] of Object.entries(manifest.icons ?? {})) {
+  try {
+    execFileSync('magick', ['-background', 'none', '-density', String(Math.max(72, Number(size) * 8)), LOGO, '-resize', `${size}x${size}`, '-gravity', 'center', '-extent', `${size}x${size}`, join(DIST, rel)])
+  } catch (e) {
+    console.error(`rendering ${rel} needs ImageMagick ("magick"): ${e.message}`)
+    process.exit(1)
+  }
+}
 manifest.version = pkg.version ?? manifest.version
 if (devOrigins.length) {
   const mirror = new URL(readJson('config/settings.defaults.json').ctanMirror).origin

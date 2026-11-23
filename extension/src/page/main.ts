@@ -11,7 +11,7 @@ import { syncFromCode, syncFromPdf } from './synctex'
 import { showToast } from './toast'
 
 const SUPPORTED: Compiler[] = ['pdflatex', 'xelatex', 'lualatex']
-const log = (...a: unknown[]) => console.info('[overleaf-local-render]', ...a)
+const log = (...a: unknown[]) => console.info('[localeaf]', ...a)
 
 installSocketHook()
 
@@ -31,7 +31,7 @@ const helloDone = start()
 let lastCompile: { status: string; passes: string[]; errors: number; main: string; log: string; ms: number } | null = null
 
 // Debug hook (also handy in the browser console): what the last local compile did.
-;(window as any).__overleafLocalRender = {
+;(window as any).__localeaf = {
   lastCompile: () => lastCompile,
   docTypes: () => mirror?.docTypes() ?? {},
   mirrorPaths: () => (mirror ? [...mirror.entities.keys()].map(id => mirror!.pathOf(id)).filter(Boolean).sort() : []),
@@ -64,6 +64,9 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
   if (url.origin !== location.origin) return originalFetch(input, init)
 
   if (url.pathname.startsWith(OUTPUT_PREFIX)) return store.respond(url.pathname, header(input, init, 'Range'))
+
+  const tree = treeChange(url, method)
+  if (tree) return trackTreeChange(tree, input, init)
 
   const m = url.pathname.match(/^\/project\/([^/]+)\/(compile|compile\/stop|output|sync\/code|sync\/pdf)$/)
   if (!m) return originalFetch(input, init)
@@ -175,9 +178,51 @@ async function restartMirror() {
   await mirror.ready
 }
 
+type TreeChange =
+  | { kind: 'rename' | 'move'; id: string }
+  | { kind: 'delete'; id: string }
+  | { kind: 'newDoc' | 'newFolder' }
+  | { kind: 'upload'; folderId: string | null }
+
+/** Overleaf's file tree requests (services/web EditorRouter / UploadsRouter). */
+function treeChange(url: URL, method: string): TreeChange | null {
+  const p = url.pathname
+  let m = p.match(/^\/project\/([^/]+)\/(?:doc|file|folder)\/([^/]+)\/(rename|move)$/)
+  if (m && method === 'POST' && m[1] === projectId) return { kind: m[3] as 'rename' | 'move', id: m[2] }
+  m = p.match(/^\/project\/([^/]+)\/(?:doc|file|folder)\/([^/]+)$/)
+  if (m && method === 'DELETE' && m[1] === projectId) return { kind: 'delete', id: m[2] }
+  m = p.match(/^\/project\/([^/]+)\/(doc|folder)$/)
+  if (m && method === 'POST' && m[1] === projectId) return { kind: m[2] === 'doc' ? 'newDoc' : 'newFolder' }
+  m = p.match(/^\/Project\/([^/]+)\/upload$/i)
+  if (m && method === 'POST' && m[1] === projectId) return { kind: 'upload', folderId: url.searchParams.get('folder_id') }
+  return null
+}
+
+/** Passes the request on and, once it succeeded, applies the change to the mirror right away. */
+async function trackTreeChange(change: TreeChange, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await originalFetch(input, init)
+  if (!res.ok || !mirror) return res
+  try {
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
+    if (change.kind === 'rename' && body.name) mirror.rename(change.id, body.name)
+    else if (change.kind === 'move' && body.folder_id) mirror.move(change.id, body.folder_id)
+    else if (change.kind === 'delete') mirror.remove(change.id)
+    else {
+      const data = await res.clone().json()
+      if (change.kind === 'newDoc' && data?._id) mirror.addDoc(body.parent_folder_id, data)
+      else if (change.kind === 'newFolder' && data?._id) mirror.addFolder({ ...data, docs: [], fileRefs: [], folders: [] }, body.parent_folder_id)
+      else if (change.kind === 'upload' && data?.entity_id) mirror.expect(data.entity_id)
+    }
+  } catch (e) {
+    log('could not apply a file tree change to the mirror', e)
+  }
+  return res
+}
+
 /** Waits until the mirror has every doc version the editor knows the server has. */
 async function barrier() {
   const deadline = performance.now() + (settings?.barrierTimeoutMs ?? 0)
+  await mirror!.waitForTree(deadline)
   for (const [doc, v] of editorVersions) {
     while (mirror!.hasDoc(doc) && (mirror!.docVersion(doc) ?? v) < v) {
       if (performance.now() > deadline) {

@@ -3,7 +3,7 @@
 // Usage: node test/e2e/run.mjs
 import { join } from 'node:path'
 import { ROOT } from '../../scripts/lib.mjs'
-import { launch } from '../lib/browser.mjs'
+import { EXTENSION_DIR, launch } from '../lib/browser.mjs'
 import { OVERLEAF_URL, ensureAdmin, login, uploadProject } from './overleaf.mjs'
 import { harness, preflight } from '../lib/harness.mjs'
 
@@ -18,7 +18,7 @@ const check = async (name, ok, detail = '') => {
   if (!ok) { failures++; await h.saveArtifacts(`check failed: ${name}`) }
 }
 
-const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
+const { context, close } = await launch({ extensionDir: EXTENSION_DIR })
 h.onCleanup(close)
 context.setDefaultTimeout(TIMEOUT)
 const serverCompiles = []
@@ -29,7 +29,7 @@ context.on('response', r => { if (r.status() === 404) notFound.push(r.url()) })
 function watchConsole(page, tag) {
   h.track(tag, page)
   const lines = []
-  page.on('console', m => { if (m.text().includes('[overleaf-local-render]')) lines.push(m.text()) })
+  page.on('console', m => { if (m.text().includes('[localeaf]')) lines.push(m.text()) })
   page.on('pageerror', e => lines.push(`pageerror: ${e.message}`))
   return {
     lines,

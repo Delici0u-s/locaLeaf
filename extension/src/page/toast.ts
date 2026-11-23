@@ -7,7 +7,7 @@ export function showToast(text: string, ms = 0) {
   const el = document.createElement('div')
   el.setAttribute('role', 'status')
   el.style.cssText = STYLE
-  el.textContent = `Overleaf local render — ${text}`
+  el.textContent = `LocaLeaf — ${text}`
   document.body.appendChild(el)
   if (ms > 0) setTimeout(() => el.remove(), ms)
   else el.addEventListener('click', () => el.remove())
