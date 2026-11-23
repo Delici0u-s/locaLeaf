@@ -13,6 +13,7 @@ async function main() {
   const enabled = !!origin && origins.includes(origin)
 
   renderSite(origin, enabled, origins, tab?.id)
+  if (enabled) await renderMirrorAccess()
   if (enabled && projectId) await renderProject(projectId, tab?.id)
   renderEngine()
   await renderSettings()
@@ -49,6 +50,21 @@ function renderSite(origin: string | null, enabled: boolean, origins: string[], 
     }
   }
   el.replaceChildren(text, button)
+}
+
+/** Without access to the CTAN mirror, packages the bundle lacks make projects compile on the server. */
+async function renderMirrorAccess() {
+  const mirror = new URL(mergeSettings(await getStored('settings')).ctanMirror).origin
+  if (await chrome.permissions.contains({ origins: [`${mirror}/*`] })) return
+  const p = document.createElement('p')
+  p.className = 'muted'
+  p.textContent = `No access to the CTAN mirror ${mirror}: projects needing packages outside the built-in bundle compile on the server.`
+  const button = document.createElement('button')
+  button.textContent = 'Allow access to the mirror'
+  button.onclick = async () => {
+    if (await chrome.permissions.request({ origins: [`${mirror}/*`] })) { p.remove(); button.remove() }
+  }
+  $('site').append(p, button)
 }
 
 async function renderProject(projectId: string, tabId?: number) {
