@@ -14,7 +14,7 @@ window.engine = {
   async init(opts) {
     worker = new Worker('/build/engine-worker.js')
     worker.onmessage = ({ data }) => {
-      if (data.type === 'print') { prints.push(data.text); return }
+      if (data.type === 'print' || data.type === 'progress') { prints.push(data.text); return }
       const p = pending
       pending = null
       if (data.type === 'error') p?.reject(new Error(data.message))

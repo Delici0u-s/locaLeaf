@@ -20,6 +20,8 @@ let ready: Promise<void> = Promise.resolve()
 let pending: { resolve: (m: FromWorker) => void; reject: (e: Error) => void } | null = null
 let queue: Promise<unknown> = Promise.resolve()
 let compileId = 0
+/** Where progress of the request being handled goes (its tab). */
+let notify: ((text: string) => void) | null = null
 /** Bumped by stop(): compiles queued before the stop are dropped instead of run on the new worker. */
 let generation = 0
 /** Which page last synced each project: diffs from another page (second tab) need a full snapshot first. */
@@ -33,6 +35,7 @@ function startWorker() {
   worker = w
   w.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     if (data.type === 'print') return
+    if (data.type === 'progress') { notify?.(data.text); return }
     const p = pending
     pending = null
     if (data.type === 'error') p?.reject(new Error(data.message))
@@ -123,7 +126,10 @@ chrome.runtime.onConnect.addListener(port => {
       return
     }
     const gen = generation
-    const run = queue.then(() => handle(req, gen))
+    const run = queue.then(() => {
+      notify = text => { try { port.postMessage({ id, progress: text }) } catch { /* tab went away */ } }
+      return handle(req, gen)
+    })
     queue = run.catch(() => undefined)
     run.then(value => reply({ ok: true, value }), err => reply({ ok: false, error: String(err?.message ?? err) }))
   })

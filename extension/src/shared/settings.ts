@@ -20,6 +20,8 @@ export interface Settings {
   maxRetryAfterMs: number
   serverOnMissingPackages: boolean
   ctanMirror: string
+  localTimeoutSeconds: number
+  statusDelayMs: number
 }
 
 export type ProjectMode = 'local' | 'server'
@@ -41,15 +43,30 @@ export const STORAGE_KEYS = {
   settings: 'settings',
   origins: 'origins',
   projectModes: 'projectModes',
+  stats: 'stats',
 } as const
+
+/** Compile counts and times (ms), per project and overall. */
+export interface CompileStats {
+  local: number
+  server: number
+  localMs: number
+  serverMs: number
+  lastMs: number
+  lastWhere: 'local' | 'server' | null
+  lastAt: number
+}
+
+export const EMPTY_STATS: CompileStats = { local: 0, server: 0, localMs: 0, serverMs: 0, lastMs: 0, lastWhere: null, lastAt: 0 }
 
 export interface Stored {
   settings: Partial<Settings>
   origins: string[]
   projectModes: Record<string, ProjectMode>
+  stats: { total: CompileStats; projects: Record<string, CompileStats> }
 }
 
-const STORED_DEFAULTS: Stored = { settings: {}, origins: [], projectModes: {} }
+const STORED_DEFAULTS: Stored = { settings: {}, origins: [], projectModes: {}, stats: { total: { ...EMPTY_STATS }, projects: {} } }
 
 /** Typed read of one chrome.storage.local key. */
 export async function getStored<K extends keyof Stored>(key: K): Promise<Stored[K]> {

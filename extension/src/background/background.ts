@@ -1,5 +1,5 @@
 // Background service worker: offscreen engine lifecycle, per-origin script registration, badge.
-import { STORAGE_KEYS, getStored, mergeSettings } from '../shared/settings'
+import { EMPTY_STATS, STORAGE_KEYS, getStored, mergeSettings, type CompileStats } from '../shared/settings'
 import type { BackgroundRequest } from '../shared/messages'
 import engineConfig from '../../../config/engine.json'
 
@@ -64,6 +64,26 @@ chrome.storage.onChanged.addListener(changes => {
   if (STORAGE_KEYS.origins in changes) registerScripts()
 })
 
+// ---- compile statistics ----
+
+let statsWrite: Promise<void> = Promise.resolve()
+function recordStats(projectId: string, where: 'local' | 'server', ms: number) {
+  const add = (s: CompileStats): CompileStats => ({
+    ...s,
+    [where]: s[where] + 1,
+    [`${where}Ms`]: s[`${where}Ms`] + ms,
+    lastMs: ms,
+    lastWhere: where,
+    lastAt: Date.now(),
+  })
+  statsWrite = statsWrite.then(async () => {
+    const stats = await getStored('stats')
+    stats.total = add({ ...EMPTY_STATS, ...stats.total })
+    stats.projects[projectId] = add({ ...EMPTY_STATS, ...stats.projects[projectId] })
+    await chrome.storage.local.set({ stats })
+  }).catch(() => undefined)
+}
+
 // ---- messages ----
 
 const BADGE: Record<string, { text: string; color: string }> = {
@@ -90,6 +110,7 @@ chrome.runtime.onMessage.addListener((msg: BackgroundRequest, sender, sendRespon
       engineConfigForOffscreen().then(sendResponse)
       return true
     case 'status': {
+      if (msg.projectId && typeof msg.ms === 'number' && msg.state !== 'idle') recordStats(msg.projectId, msg.state === 'local' ? 'local' : 'server', msg.ms)
       const tabId = sender.tab?.id
       const b = BADGE[msg.state]
       if (tabId !== undefined && b) {

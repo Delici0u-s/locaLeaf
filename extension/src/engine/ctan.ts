@@ -47,11 +47,47 @@ export async function unxz(bytes: Uint8Array): Promise<Uint8Array> {
 }
 
 /** Runtime files of a TeX Live package (archive paths are relative to texmf-dist), downloaded once and cached. */
-export async function packageFiles(mirror: string, pkg: string, cache: (key: string, load: () => Promise<ArrayBuffer | null>) => Promise<ArrayBuffer | null>): Promise<TarEntry[]> {
+export interface DownloadLimits {
+  maxBytes: number
+  timeoutMs: number
+  onTooLarge: (bytes: number) => void
+  /** Called as the archive streams in (bytes so far, total or 0 if unknown). */
+  onProgress: (loaded: number, total: number) => void
+}
+
+/** Reads a response body, reporting progress about every 2% (or every chunk when the size is unknown). */
+async function readWithProgress(res: Response, onProgress: (loaded: number, total: number) => void): Promise<ArrayBuffer> {
+  const total = Number(res.headers.get('Content-Length') ?? 0)
+  if (!res.body) return res.arrayBuffer()
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let loaded = 0
+  let reported = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    loaded += value.length
+    if (!total || loaded - reported >= total / 50) { reported = loaded; onProgress(loaded, total) }
+  }
+  const out = new Uint8Array(loaded)
+  let o = 0
+  for (const c of chunks) { out.set(c, o); o += c.length }
+  return out.buffer
+}
+
+export async function packageFiles(mirror: string, pkg: string, cache: (key: string, load: () => Promise<ArrayBuffer | null>) => Promise<ArrayBuffer | null>, limits: DownloadLimits): Promise<TarEntry[]> {
   const url = `${mirror.replace(/\/$/, '')}/systems/texlive/tlnet/archive/${encodeURIComponent(pkg)}.tar.xz`
   const xz = await cache(`ctan:${url}`, async () => {
-    const res = await fetch(url)
-    return res.ok ? res.arrayBuffer() : null
+    const res = await fetch(url, { signal: AbortSignal.timeout(limits.timeoutMs) })
+    if (!res.ok) return null
+    const size = Number(res.headers.get('Content-Length') ?? 0)
+    if (size > limits.maxBytes) {
+      limits.onTooLarge(size)
+      await res.body?.cancel()
+      return null
+    }
+    return readWithProgress(res, limits.onProgress)
   })
   if (!xz) return []
   return readTar(await unxz(new Uint8Array(xz))).filter(e => !e.path.startsWith('tlpkg/'))

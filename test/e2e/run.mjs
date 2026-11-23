@@ -139,7 +139,12 @@ try {
   const fresh = await con.waitFor(/compiled .* locally|local compile failed/, n7)
   await check('recompile after clearing the cache is a full local build', /locally: success, ([2-9]|\d\d) passes/.test(fresh), fresh)
 
-  // 8. Nothing was compiled on the server.
+  // 8. Compile statistics count this project's local compiles.
+  const sw = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker')
+  const stats = await sw.evaluate(id => chrome.storage.local.get('stats').then(r => r.stats?.projects?.[id]), projectId)
+  await check('compile statistics count the local compiles', (stats?.local ?? 0) >= 4 && (stats?.server ?? 0) === 0, JSON.stringify(stats))
+
+  // 9. Nothing was compiled on the server.
   await check('no compile request reached the server', serverCompiles.length === 0, serverCompiles.join(', '))
   await tab2.close()
 } catch (e) {

@@ -74,6 +74,8 @@ try {
   const n2 = ours().length
   await page.locator('button:has-text("Recompile")').first().click()
   await page.waitForTimeout(3000) // well into the TeX run
+  const indicator = await page.locator('[role=status]:has-text("LocaLeaf")').first().textContent().catch(() => '')
+  await check('progress indicator shows the running TeX pass', /TeX pass \d/.test(indicator ?? ''), indicator ?? '')
   const t1 = Date.now()
   await page.locator('button[aria-label="Toggle compile options menu"]').click()
   await page.locator('[role=menuitem]:has-text("Stop compilation"), .dropdown-item:has-text("Stop compilation")').first().click()
@@ -81,6 +83,19 @@ try {
   const took = Date.now() - t1
   await check('stopping a running TeX pass ends it quickly', /compile stopped/.test(midStop) && took < stopMaxMs, `${took} ms · ${midStop}`)
   await check('no compile request reached the server', serverCompiles.length === 0, serverCompiles.join(', '))
+  await check('indicator is gone after the compile', (await page.locator('[role=status]:has-text("LocaLeaf")').count()) === 0)
+
+  // Time limit: with localTimeoutSeconds set low, the slow compile is abandoned and compiled on the server.
+  h.step('setting a 5 s time limit and compiling the slow document again')
+  const sw = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker')
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { localTimeoutSeconds: 5 } }))
+  await page.reload()
+  const n3 = ours().length
+  const serverBefore = serverCompiles.length
+  await h.waitFor('the compile on load', () => ours().slice(n3).find(l => /compiled .* locally|local compile failed/.test(l)))
+  const limited = ours().slice(n3).find(l => /local compile failed/.test(l)) ?? ''
+  await check('a compile over the time limit falls back to the server', /took longer than 5 s/.test(limited) && serverCompiles.length > serverBefore, limited)
+  await sw.evaluate(() => chrome.storage.local.remove('settings'))
 } catch (e) {
   await check('test ran to the end', false, String(e?.stack ?? e).slice(0, 800))
 } finally {

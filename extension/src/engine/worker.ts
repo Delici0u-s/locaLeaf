@@ -76,7 +76,11 @@ async function init(basePath: string, bundles: string[], remoteEndpoint: string,
   let versions: Record<string, string> = {}
   pipeline = new BusytexPipeline(
     url('busytex.js'), url('busytex.wasm'), bundleJs, bundleJs, [],
-    (text: string) => post({ type: 'print', text }),
+    (text: string) => {
+      post({ type: 'print', text })
+      // first start: busytex reports loading the TeX Live data ("Preparing... (3/7)")
+      if (/^(Preparing|All downloads)/.test(text)) post({ type: 'progress', text: `starting the TeX engine: ${text}` })
+    },
     (v: Record<string, string>) => { versions = v },
     true, BusytexPipeline.ScriptLoaderWorker,
     url('biber.js'), url('biber.wasm'), url('biber.data'),
@@ -200,6 +204,7 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   const passes: string[] = []
   const run = (cmd: string[], isBibtex = false) => {
     passes.push(cmd[0])
+    post({ type: 'progress', text: cmd[0].includes('latex') ? `TeX pass ${passes.filter(p => p.includes('latex')).length}` : `running ${cmd[0]}` })
     const logs: any[] = []
     pipeline._run_cmd(Module, FS, cmd, [], 'silent', `${JOB}.log`, `${JOB}.blg`, `${JOB}.aux`, `${JOB}.bbl`, memHeader, logs)
     return logs[0]
@@ -260,6 +265,8 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   return result
 }
 
+const mb = (bytes: number) => `${(bytes / 1048576).toFixed(1)} MB`
+
 function setRemote(endpoint: string) {
   remoteEndpoint = endpoint.replace(/\/$/, '')
 }
@@ -282,7 +289,7 @@ async function fetchFonts(names: string[], outDir: string): Promise<number> {
     Module.FS.writeFile(target, bytes)
     added++
   }))
-  post({ type: 'print', text: `fonts: fetched ${added} of ${files.size} files for ${names.join(', ')}` })
+  post({ type: 'progress', text: `fonts: fetched ${added} of ${files.size} files for ${names.join(', ')}` })
   return added
 }
 
@@ -291,7 +298,7 @@ async function fontBytes(file: string): Promise<Uint8Array | null> {
   const format = /\.otf$/i.test(file) ? 47 : 36 // kpathsea: opentype / truetype
   const buf = await cached(`font:${remoteEndpoint}/${file}`, async () => {
     try {
-      const res = await fetch(`${remoteEndpoint}/${format}/${encodeURIComponent(file)}`)
+      const res = await fetch(`${remoteEndpoint}/${format}/${encodeURIComponent(file)}`, { signal: AbortSignal.timeout(settings.downloadTimeoutSeconds * 1000) })
       return res.ok ? res.arrayBuffer() : null
     } catch {
       return null
@@ -314,12 +321,18 @@ function loadTexliveIndex(): Promise<Record<string, string> | null> {
 function ctanPackage(pkg: string): Promise<TarEntryLike[]> {
   let p = ctanPackages.get(pkg)
   if (!p) {
-    p = packageFiles(ctanMirror, pkg, cached).then(entries => {
+    post({ type: 'progress', text: `downloading TeX Live package "${pkg}" from CTAN` })
+    p = packageFiles(ctanMirror, pkg, cached, {
+      maxBytes: settings.maxCtanPackageMB * 1024 * 1024,
+      timeoutMs: settings.downloadTimeoutSeconds * 1000,
+      onTooLarge: bytes => post({ type: 'progress', text: `skipping TeX Live package "${pkg}": ${(bytes / 1048576).toFixed(0)} MB is over the ${settings.maxCtanPackageMB} MB limit` }),
+      onProgress: (loaded, total) => post({ type: 'progress', text: `downloading TeX Live package "${pkg}" from CTAN: ${mb(loaded)}${total ? ` of ${mb(total)} (${Math.round((100 * loaded) / total)}%)` : ''}` }),
+    }).then(entries => {
       for (const e of entries) {
         const name = e.path.slice(e.path.lastIndexOf('/') + 1)
         Module.kpse_remote_register(name, kpseFormat(name), e.bytes)
       }
-      post({ type: 'print', text: `ctan: ${pkg} (${entries.length} files)` })
+      post({ type: 'progress', text: `TeX Live package "${pkg}": ${entries.length} files` })
       return entries
     }, () => [])
     ctanPackages.set(pkg, p)

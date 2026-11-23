@@ -16,7 +16,11 @@ async function enginePort(): Promise<chrome.runtime.Port> {
   const r = await chrome.runtime.sendMessage({ type: 'ensureEngine' })
   if (!r?.ok) throw new Error(`engine unavailable: ${r?.error ?? 'no response'}`)
   const p = chrome.runtime.connect({ name: ENGINE_PORT })
-  p.onMessage.addListener(({ id, ok, value, error }) => {
+  p.onMessage.addListener(({ id, ok, value, error, progress }) => {
+    if (progress !== undefined) {
+      window.postMessage({ channel: EXT_CHANNEL, progress }, window.location.origin)
+      return
+    }
     const w = waiting.get(id)
     waiting.delete(id)
     if (ok) w?.resolve(value)
@@ -87,7 +91,7 @@ async function handle(req: PageRequest): Promise<unknown> {
     case 'clear':
       return engine({ type: 'clear', projectId: req.projectId })
     case 'status':
-      return chrome.runtime.sendMessage({ type: 'status', state: req.state, detail: req.detail })
+      return chrome.runtime.sendMessage({ ...req, type: 'status' })
   }
 }
 

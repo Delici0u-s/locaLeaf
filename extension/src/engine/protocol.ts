@@ -17,6 +17,10 @@ export interface EngineSettings {
   fetchMissingFonts: boolean
   /** Fetch TeX Live packages from the CTAN mirror when the bundle and remoteEndpoint lack a file. */
   fetchFromCtan: boolean
+  /** CTAN packages larger than this aren't downloaded (some are hundreds of MB); their files go to the server. */
+  maxCtanPackageMB: number
+  /** Give up on a single download (package, font) after this long. */
+  downloadTimeoutSeconds: number
 }
 
 export interface InitMessage {
@@ -95,4 +99,6 @@ export type FromWorker =
   | { type: 'compiled'; id: number; result: CompileResult }
   | { type: 'cleared'; projectId: string }
   | { type: 'print'; text: string }
+  /** What the engine is doing right now (shown in the page while a compile runs). */
+  | { type: 'progress'; text: string }
   | { type: 'error'; id?: number; message: string }

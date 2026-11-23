@@ -4,8 +4,15 @@ import { EXT_CHANNEL, PAGE_CHANNEL, type PageRequest } from '../shared/messages'
 let nextId = 0
 const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 
+const progressListeners: ((text: string) => void)[] = []
+/** Engine progress (TeX passes, downloads, engine start) while a request runs. */
+export function onProgress(fn: (text: string) => void) {
+  progressListeners.push(fn)
+}
+
 window.addEventListener('message', event => {
   if (event.source !== window || event.data?.channel !== EXT_CHANNEL) return
+  if (typeof event.data.progress === 'string') { for (const l of progressListeners) l(event.data.progress); return }
   const { id, ok, value, error } = event.data
   const w = waiting.get(id)
   if (!w) return

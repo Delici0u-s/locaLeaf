@@ -1,6 +1,6 @@
 // Popup: enable the extension on the current Overleaf site, pick local/server compiling per project,
 // show the engine state, and edit settings (generated from the defaults, so new settings appear here).
-import { DEFAULT_SETTINGS, STORAGE_KEYS, getStored, mergeSettings, type ProjectMode } from '../shared/settings'
+import { DEFAULT_SETTINGS, STORAGE_KEYS, getStored, mergeSettings, type CompileStats, type ProjectMode } from '../shared/settings'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -16,6 +16,7 @@ async function main() {
   renderSite(origin, enabled, origins, tab?.id, !!origin && builtIn.includes(origin))
   if (enabled) await renderMirrorAccess()
   if (enabled && projectId) await renderProject(projectId, tab?.id)
+  await renderStats(projectId)
   renderEngine()
   await renderSettings()
 }
@@ -116,6 +117,21 @@ async function renderProject(projectId: string, tabId?: number) {
     row.append(label)
   }
   el.replaceChildren(row)
+}
+
+async function renderStats(projectId: string | null) {
+  const stats = await getStored('stats')
+  const fmt = (ms: number) => (ms >= 10_000 ? `${(ms / 1000).toFixed(0)} s` : `${(ms / 1000).toFixed(1)} s`)
+  const line = (label: string, s: CompileStats | undefined) => {
+    if (!s || s.local + s.server === 0) return null
+    const p = document.createElement('p')
+    p.className = 'muted'
+    const avg = (n: number, ms: number) => (n ? `, avg ${fmt(ms / n)}` : '')
+    p.textContent = `${label}: ${s.local} local${avg(s.local, s.localMs)} · ${s.server} on the server${avg(s.server, s.serverMs)} · last ${fmt(s.lastMs)} (${s.lastWhere === 'local' ? 'local' : 'server'})`
+    return p
+  }
+  const rows = [projectId ? line('This project', stats.projects[projectId]) : null, line('All projects', stats.total)].filter((x): x is HTMLParagraphElement => !!x)
+  $('stats').replaceChildren(...rows)
 }
 
 function renderEngine() {

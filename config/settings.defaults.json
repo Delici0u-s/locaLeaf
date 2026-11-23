@@ -29,7 +29,10 @@
     "maxProjects": 4,
     "$maxProjects": "Projects whose files the engine keeps in memory between compiles (least recently used ones are dropped and re-sent when needed).",
     "fetchMissingFonts": true,
-    "fetchFromCtan": true
+    "fetchFromCtan": true,
+    "maxCtanPackageMB": 60,
+    "downloadTimeoutSeconds": 120,
+    "$maxCtanPackageMB": "CTAN packages larger than this aren't downloaded (font collections like Noto are hundreds of MB); projects needing them compile on the server."
   },
   "keepBuilds": 3,
   "barrierTimeoutMs": 3000,
@@ -54,5 +57,9 @@
   "serverOnMissingPackages": true,
   "$serverOnMissingPackages": "If the document needs TeX Live files the engine can't get (e.g. a class missing on remoteEndpoint), compile on the server instead. Missing project files (typos) don't count.",
   "ctanMirror": "https://ftp.fau.de/ctan",
-  "$ctanMirror": "CTAN mirror for TeX Live packages that neither the bundle nor remoteEndpoint has (…/systems/texlive/tlnet/archive/<pkg>.tar.xz). The extension asks for access to it when you enable a site."
+  "$ctanMirror": "CTAN mirror for TeX Live packages that neither the bundle nor remoteEndpoint has (…/systems/texlive/tlnet/archive/<pkg>.tar.xz). The extension asks for access to it when you enable a site.",
+  "localTimeoutSeconds": 240,
+  "$localTimeoutSeconds": "A local compile (including loading the project and downloads) that takes longer than this is stopped and compiled on the server instead. 0 = no limit.",
+  "statusDelayMs": 800,
+  "$statusDelayMs": "Show the progress indicator in the page when a compile takes longer than this."
 }

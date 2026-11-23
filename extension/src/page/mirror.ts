@@ -33,7 +33,7 @@ export class ProjectMirror {
   /** Set when the mirror lost track (disconnect, failed op); the next sync must be a full reset. */
   broken = false
 
-  constructor(private projectId: string, private wsUrl: string, private settings: Settings, private log: (...a: unknown[]) => void) {
+  constructor(private projectId: string, private wsUrl: string, private settings: Settings, private log: (...a: unknown[]) => void, private progress: (text: string) => void = () => {}) {
     this.ready = this.start().catch(e => {
       this.broken = true
       throw e
@@ -60,8 +60,14 @@ export class ProjectMirror {
     this.addFolder(project.rootFolder[0], null)
     this.listen()
     const ids = [...this.entities.values()]
-    await pool(ids.filter(e => e.kind === 'doc'), this.settings.joinConcurrency, e => this.joinDocWithRetry(e.id))
-    await pool(ids.filter(e => e.kind === 'file'), this.settings.fetchConcurrency, e => this.fetchFile(e))
+    const docs = ids.filter(e => e.kind === 'doc')
+    const files = ids.filter(e => e.kind === 'file')
+    let doneDocs = 0
+    let doneFiles = 0
+    const report = () => this.progress(`loading the project: ${doneDocs}/${docs.length} documents, ${doneFiles}/${files.length} files`)
+    report()
+    await pool(docs, this.settings.joinConcurrency, async e => { await this.joinDocWithRetry(e.id); doneDocs++; report() })
+    await pool(files, this.settings.fetchConcurrency, async e => { await this.fetchFile(e); doneFiles++; report() })
     this.log(`mirror ready: ${this.docs.size} docs, ${this.files.size} files`)
   }
 

@@ -19,7 +19,7 @@ export type PageRequest =
   | { type: 'compile'; projectId: string; clientId: string; sync: SyncPayload; options: CompileOptions; expectEpoch: number | null }
   | { type: 'stop' }
   | { type: 'clear'; projectId: string }
-  | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string }
+  | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
 
 export interface HelloReply {
   settings: Settings
@@ -57,5 +57,5 @@ export type BackgroundRequest =
   | { type: 'offscreenReady' }
   | { type: 'closeEngine' }
   | { type: 'getEngineConfig' }
-  | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string }
+  | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
   | { type: 'engineStatus' }

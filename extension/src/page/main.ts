@@ -3,7 +3,8 @@
 import type { CompileOptions, CompileResult, Compiler } from '../engine/protocol'
 import type { CompileReply, HelloReply } from '../shared/messages'
 import type { Settings } from '../shared/settings'
-import { ext, getMeta, whenDomReady } from './bridge'
+import { ext, getMeta, onProgress, whenDomReady } from './bridge'
+import { beginStatus, finishStatus, updateStatus } from './status'
 import { ProjectMirror } from './mirror'
 import { OUTPUT_PREFIX, OutputStore, compileResponse } from './outputs'
 import { installSocketHook, onEditorSocket, whenIo } from './socket-hook'
@@ -28,6 +29,14 @@ let serverOnly: string | null = null
 const clientId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 const store = new OutputStore(() => settings?.keepBuilds ?? 1)
 const helloDone = start()
+
+// Engine progress → indicator, and to the console (download percentages only every quarter).
+onProgress(text => {
+  updateStatus(text)
+  const pct = text.match(/\((\d+)%\)$/)
+  if (!pct || Number(pct[1]) % 25 === 0) log(text)
+})
+const mirrorProgress = (text: string) => updateStatus(text)
 let lastCompile: { status: string; passes: string[]; errors: number; main: string; log: string; ms: number } | null = null
 
 // Debug hook (also handy in the browser console): what the last local compile did.
@@ -54,7 +63,7 @@ async function start() {
   log(`mode: ${mode}`)
   if (mode !== 'local') return
   await whenIo()
-  mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings, log)
+  mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings, log, mirrorProgress)
   mirror.ready.then(() => noticeTexLiveYear(hello.texliveYear), e => log('mirror failed to start', e))
 }
 
@@ -75,7 +84,12 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
 
   const action = m[2]
   if (action === 'compile' && method === 'POST') {
-    if (serverOnly) return originalFetch(input, init)
+    if (serverOnly) {
+      const t = performance.now()
+      const res = await originalFetch(input, init)
+      ext({ type: 'status', state: 'fallback', detail: serverOnly, projectId, ms: performance.now() - t }).catch(() => undefined)
+      return res
+    }
     return handleCompile(input, init)
   }
   if (action === 'compile/stop' && method === 'POST' && compiling) {
@@ -100,9 +114,42 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
 async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const t0 = performance.now()
   const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}')
-  const state = { stopped: false }
+  const state = { stopped: false, abandoned: false }
   compiling = state
+  beginStatus('compiling locally', settings?.statusDelayMs ?? 0)
+  // A local compile that runs past the limit is stopped and compiled on the server instead.
+  const limitS = settings?.localTimeoutSeconds ?? 0
+  let timer: number | undefined
+  const tooLong = new Promise<never>((_, reject) => {
+    if (limitS > 0) timer = window.setTimeout(() => {
+      state.abandoned = true
+      ext({ type: 'stop' }).catch(() => undefined)
+      knownEpoch = null
+      reject(new Fallback(`the local compile took longer than ${limitS} s`))
+    }, limitS * 1000)
+  })
   try {
+    return await Promise.race([compileLocally(state, t0, body), tooLong])
+  } catch (e: any) {
+    knownEpoch = null
+    if (state.stopped) {
+      log(`compile stopped after ${Math.round(performance.now() - t0)} ms`)
+      return json({ status: 'terminated', outputFiles: [], pdfCachingMinChunkSize: 0, validationProblems: null })
+    }
+    log('local compile failed:', e)
+    if (settings?.fallbackToServer === false && !(e instanceof Fallback)) throw e
+    ext({ type: 'status', state: 'fallback', detail: String(e?.message ?? e), projectId, ms: performance.now() - t0 }).catch(() => undefined)
+    showToast(`Compiled on the server: ${e?.message ?? e}`, settings?.toastMs)
+    return originalFetch(input, init)
+  } finally {
+    clearTimeout(timer)
+    finishStatus()
+    compiling = null
+  }
+}
+
+async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t0: number, body: any): Promise<Response> {
+  {
     // A mirror that failed to start (server hiccup) gets one fresh attempt per compile.
     await mirror!.ready.catch(() => restartMirror())
     const compiler = mirror!.project.compiler as Compiler
@@ -111,6 +158,7 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     if (!main) throw new Fallback('no main document')
     await barrier()
     const options: CompileOptions = { main, compiler, draft: !!body.draft, stopOnFirstError: !!body.stopOnFirstError }
+    if (state.abandoned) throw new Error('abandoned after the time limit')
     const result = await compileWithEngine(options)
     if (state.stopped) throw new Error('stopped') // finished anyway (e.g. it was still queued): discard it
     if (result.missingFonts.length && settings?.serverOnMissingFonts) {
@@ -124,21 +172,8 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     const build = store.add(projectId, result)
     lastCompile = { status: result.status, passes: result.passes, errors: result.errors, main, ms: result.ms, log: new TextDecoder().decode(result.files['output.log'] ?? new Uint8Array()) }
     log(`compiled ${main} locally: ${result.status}, ${result.passes.length} passes, engine ${Math.round(result.ms)} ms, total ${Math.round(performance.now() - t0)} ms${result.cached ? ' (unchanged)' : ''}`)
-    ext({ type: 'status', state: 'local', detail: `last compile ${result.status} in ${(result.ms / 1000).toFixed(1)} s` }).catch(() => undefined)
+    ext({ type: 'status', state: 'local', detail: `last compile ${result.status} in ${(result.ms / 1000).toFixed(1)} s`, projectId, ms: performance.now() - t0, cached: result.cached }).catch(() => undefined)
     return json(compileResponse(store, build, result))
-  } catch (e: any) {
-    knownEpoch = null
-    if (state.stopped) {
-      log(`compile stopped after ${Math.round(performance.now() - t0)} ms`)
-      return json({ status: 'terminated', outputFiles: [], pdfCachingMinChunkSize: 0, validationProblems: null })
-    }
-    log('local compile failed:', e)
-    if (settings?.fallbackToServer === false && !(e instanceof Fallback)) throw e
-    ext({ type: 'status', state: 'fallback', detail: String(e?.message ?? e) }).catch(() => undefined)
-    showToast(`Compiled on the server: ${e?.message ?? e}`, settings?.toastMs)
-    return originalFetch(input, init)
-  } finally {
-    compiling = null
   }
 }
 
@@ -173,7 +208,7 @@ async function compileWithEngine(options: CompileOptions): Promise<CompileResult
 async function restartMirror() {
   log('mirror lost track of the project, reconnecting')
   mirror!.close()
-  mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings!, log)
+  mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings!, log, mirrorProgress)
   knownEpoch = null
   await mirror.ready
 }
