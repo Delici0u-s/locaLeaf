@@ -17,12 +17,18 @@ export interface Settings {
   serverOnMissingFonts: boolean
   joinRetries: number
   joinRetryDelayMs: number
+  joinTimeoutMs: number
   maxRetryAfterMs: number
   serverOnMissingPackages: boolean
   ctanMirror: string
   localTimeoutSeconds: number
   statusDelayMs: number
+  statusPosition: StatusPosition
+  statusX: number
+  statusY: number
 }
+
+export type StatusPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'toolbar' | 'custom'
 
 export type ProjectMode = 'local' | 'server'
 

@@ -85,6 +85,11 @@ async function handle(req: PageRequest): Promise<unknown> {
       const files = Object.fromEntries(Object.entries(r.result.files).map(([k, v]) => [k, fromBase64(v)]))
       return { kind: 'done', epoch: r.epoch, result: { ...r.result, files } } satisfies CompileReply
     }
+    case 'updateSettings': {
+      const current = await getStored('settings')
+      await chrome.storage.local.set({ settings: { ...current, ...req.patch } })
+      return null
+    }
     case 'stop':
       stopRequested = true
       return engine({ type: 'stop' })

@@ -4,7 +4,7 @@ import type { CompileOptions, CompileResult, Compiler } from '../engine/protocol
 import type { CompileReply, HelloReply } from '../shared/messages'
 import type { Settings } from '../shared/settings'
 import { ext, getMeta, onProgress, whenDomReady } from './bridge'
-import { beginStatus, finishStatus, updateStatus } from './status'
+import { beginStatus, configureStatus, finishStatus, updateStatus } from './status'
 import { ProjectMirror } from './mirror'
 import { OUTPUT_PREFIX, OutputStore, compileResponse } from './outputs'
 import { installSocketHook, onEditorSocket, whenIo } from './socket-hook'
@@ -60,6 +60,7 @@ async function start() {
   const hello = await ext<HelloReply>({ type: 'hello', projectId })
   settings = hello.settings
   mode = hello.mode
+  configureStatus(settings, (x, y) => ext({ type: 'updateSettings', patch: { statusPosition: 'custom', statusX: x, statusY: y } }).catch(() => undefined))
   log(`mode: ${mode}`)
   if (mode !== 'local') return
   await whenIo()

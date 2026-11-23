@@ -139,7 +139,15 @@ export class ProjectMirror {
 
   private joinDoc(id: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // A server that never answers would otherwise leave the mirror (and the compile) waiting forever.
+      let answered = false
+      const timer = window.setTimeout(() => {
+        if (!answered) { answered = true; reject(new Error(`joinDoc ${id}: no answer within ${this.settings.joinTimeoutMs} ms`)) }
+      }, this.settings.joinTimeoutMs)
       this.socket.emit('joinDoc', id, { encodeRanges: true, supportsHistoryOT: true }, (err: any, lines: any, version: number, _updates: unknown, _ranges: unknown, type = 'sharejs-text-ot') => {
+        if (answered) return
+        answered = true
+        clearTimeout(timer)
         if (err) return reject(new Error(`joinDoc ${id}: ${err.message ?? err}`))
         const text = type === 'history-ot' ? historyOtText(lines) : (lines as string[]).map(decodeLine).join('\n')
         const prev = this.docs.get(id)

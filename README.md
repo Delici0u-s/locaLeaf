@@ -47,6 +47,9 @@ Then in Brave (Chrome works the same way, under `chrome://extensions`):
 3. Click **Load unpacked** and choose the `dist/` folder.
 4. Optional: pin LocaLeaf in the toolbar (puzzle icon → pin), so you see its badge.
 
+**On another machine without Node.js:** `npm run package` makes `release/localeaf-<version>.zip` (no personal
+`localeaf.local.json` in it). Unzip it there and use **Load unpacked** on the unzipped folder.
+
 **Updating:** run `npm run build` again, then click the reload arrow on LocaLeaf's card in `brave://extensions`,
 and reload the Overleaf tab.
 

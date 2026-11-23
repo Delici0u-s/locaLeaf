@@ -8,7 +8,8 @@
     "default": 600000,
     "e2e-history-ot": 600000,
     "e2e-stop": 600000,
-    "e2e-any-site": 300000
+    "e2e-any-site": 300000,
+    "e2e-ui": 420000
   },
   "step": {
     "default": 180000,

@@ -14,11 +14,13 @@
     "test:e2e": "node test/e2e/run.mjs",
     "test:e2e:extremes": "node test/e2e/extremes.mjs",
     "test:e2e:fixtures": "node test/e2e/fixtures.mjs",
-    "test:all": "npm run -s typecheck && npm run -s build:test && npm run -s test:unit && npm run -s test:engine && npm run -s test:e2e && npm run -s test:e2e:history-ot && npm run -s test:e2e:stop && npm run -s test:e2e:any-site && npm run -s test:e2e:extremes && npm run -s test:e2e:fixtures",
+    "test:all": "npm run -s typecheck && npm run -s build:test && npm run -s test:unit && npm run -s test:engine && npm run -s test:e2e && npm run -s test:e2e:history-ot && npm run -s test:e2e:stop && npm run -s test:e2e:any-site && npm run -s test:e2e:ui && npm run -s test:e2e:extremes && npm run -s test:e2e:fixtures",
     "test:e2e:history-ot": "node test/e2e/history-ot.mjs",
     "test:e2e:stop": "node test/e2e/stop.mjs",
     "build:test": "LOCALEAF_SITES=${OLR_E2E_URL:-http://localhost:8090} OLR_DIST_DIR=dist-test node scripts/build.mjs",
-    "test:e2e:any-site": "node test/e2e/any-site.mjs"
+    "test:e2e:any-site": "node test/e2e/any-site.mjs",
+    "test:e2e:ui": "node test/e2e/ui.mjs",
+    "package": "node scripts/package.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.7",

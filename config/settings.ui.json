@@ -1,0 +1,136 @@
+{
+  "$comment": "How the popup shows the settings: groups (in order), labels and help. Settings not listed here appear under 'Advanced', so a new setting is never hidden. Keys use dots for nesting (engine.maxPasses).",
+  "groups": [
+    {
+      "title": "Progress indicator",
+      "keys": [
+        "statusPosition",
+        "statusDelayMs",
+        "toastMs"
+      ]
+    },
+    {
+      "title": "When to compile on the server",
+      "keys": [
+        "fallbackToServer",
+        "serverOnMissingPackages",
+        "serverOnMissingFonts",
+        "localTimeoutSeconds"
+      ]
+    },
+    {
+      "title": "Packages outside the built-in bundle",
+      "keys": [
+        "remoteEndpoint",
+        "engine.fetchFromCtan",
+        "ctanMirror",
+        "engine.fetchMissingFonts",
+        "engine.maxCtanPackageMB",
+        "engine.downloadTimeoutSeconds"
+      ]
+    },
+    {
+      "title": "Engine",
+      "keys": [
+        "engine.maxPasses",
+        "engine.maxProjects",
+        "engineIdleMinutes",
+        "engine.biberArgs"
+      ]
+    }
+  ],
+  "fields": {
+    "statusPosition": {
+      "label": "Position",
+      "help": "Drag the chip in the page to place it freely.",
+      "options": [
+        [
+          "bottom-left",
+          "Bottom left"
+        ],
+        [
+          "bottom-right",
+          "Bottom right"
+        ],
+        [
+          "top-left",
+          "Top left"
+        ],
+        [
+          "top-right",
+          "Top right"
+        ],
+        [
+          "toolbar",
+          "Next to the download button"
+        ],
+        [
+          "custom",
+          "Where I dragged it"
+        ]
+      ]
+    },
+    "statusDelayMs": {
+      "label": "Show after",
+      "unit": "ms",
+      "help": "Quick compiles don't show the chip at all."
+    },
+    "toastMs": {
+      "label": "Notices stay for",
+      "unit": "ms",
+      "help": "Notices like \"compiled on the server: …\"."
+    },
+    "fallbackToServer": {
+      "label": "Compile on the server if a local compile can't run",
+      "help": "E.g. engine errors. Off: show the error instead."
+    },
+    "serverOnMissingPackages": {
+      "label": "…if TeX Live packages are missing locally"
+    },
+    "serverOnMissingFonts": {
+      "label": "…if fonts are missing locally"
+    },
+    "localTimeoutSeconds": {
+      "label": "…if a local compile takes longer than",
+      "unit": "s",
+      "help": "0: no limit."
+    },
+    "remoteEndpoint": {
+      "label": "Package server",
+      "help": "Single files by name. Empty: off."
+    },
+    "engine.fetchFromCtan": {
+      "label": "Download whole TeX Live packages from CTAN",
+      "help": "For files the package server lacks."
+    },
+    "ctanMirror": {
+      "label": "CTAN mirror"
+    },
+    "engine.fetchMissingFonts": {
+      "label": "Fetch fonts asked for by name (fontspec)"
+    },
+    "engine.maxCtanPackageMB": {
+      "label": "Largest package to download",
+      "unit": "MB"
+    },
+    "engine.downloadTimeoutSeconds": {
+      "label": "Give up on a download after",
+      "unit": "s"
+    },
+    "engine.maxPasses": {
+      "label": "TeX passes per compile at most"
+    },
+    "engine.maxProjects": {
+      "label": "Projects kept in engine memory"
+    },
+    "engineIdleMinutes": {
+      "label": "Close the engine when unused for",
+      "unit": "min",
+      "help": "0: keep it running."
+    },
+    "engine.biberArgs": {
+      "label": "Extra biber arguments",
+      "help": "Comma separated."
+    }
+  }
+}

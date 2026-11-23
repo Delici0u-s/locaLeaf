@@ -6,15 +6,21 @@
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-<h1><img src="icons/localeaf.svg" alt="" class="logo">LocaLeaf</h1>
-<section id="site"></section>
-<section id="project" hidden></section>
-<section id="stats"></section>
-<section id="engine"><span id="engine-status">Engine: not started</span></section>
-<details id="settings-box">
-  <summary>Settings</summary>
-  <form id="settings"></form>
-</details>
+<header>
+  <img src="icons/localeaf.svg" alt="" class="logo">
+  <h1>LocaLeaf</h1>
+  <span id="engine" class="pill" title="TeX engine">engine</span>
+</header>
+<main>
+  <section id="site" class="card"></section>
+  <section id="project" class="card" hidden></section>
+  <section id="stats" class="card" hidden></section>
+  <section id="settings" class="card">
+    <h2>Settings</h2>
+    <div id="groups"></div>
+    <p class="actions"><button type="button" id="reset" class="link">Reset all settings</button></p>
+  </section>
+</main>
 <script src="popup.js"></script>
 </body>
 </html>
