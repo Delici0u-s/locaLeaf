@@ -20,9 +20,15 @@ export type PageRequest =
   | { type: 'stop' }
   | { type: 'clear'; projectId: string }
   | { type: 'debugAbort' }
+  /** What the tab is doing right now (shown live in the popup). */
+  | { type: 'live'; state: LiveState; text: string }
   /** Merges into the stored settings (e.g. where the progress chip was dragged). */
   | { type: 'updateSettings'; patch: Partial<Settings> }
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
+
+export type LiveState = 'loading' | 'compiling' | 'server' | 'idle' | 'off'
+export interface LiveStatus { state: LiveState; text: string; at: number }
+export const liveKey = (tabId: number) => `live:${tabId}`
 
 export interface HelloReply {
   settings: Settings
@@ -63,3 +69,4 @@ export type BackgroundRequest =
   | { type: 'getEngineConfig' }
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
   | { type: 'engineStatus' }
+  | { type: 'live'; state: LiveState; text: string }

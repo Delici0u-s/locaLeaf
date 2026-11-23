@@ -1,13 +1,17 @@
 // Progress chip in the page while a local compile runs (loading the project, starting the engine, TeX passes,
 // downloads). Appears after settings.statusDelayMs so quick compiles don't flash it. Placed per
-// settings.statusPosition: a screen corner, inline next to Overleaf's download button ("toolbar"), or where the
-// user dragged it ("custom", stored as fractions of the window size so it stays inside on resize).
+// settings.statusPosition: next to Overleaf's download button ("toolbar"), a screen corner, or where the user
+// dragged it ("custom", stored as fractions of the window size so it stays inside on resize).
+// The chip always floats over the page (never inserted into Overleaf's React-managed toolbar), and anything
+// unexpected about the toolbar makes it fall back to settings.statusFallbackPosition instead of failing.
 import type { Settings, StatusPosition } from '../shared/settings'
 
 const BASE = 'z-index:2147483647;display:flex;gap:.6rem;align-items:center;border-radius:.45rem;background:#1f3d2b;color:#fff;' +
   'font:13px/1.4 system-ui,sans-serif;overflow-wrap:anywhere;user-select:none;cursor:grab;touch-action:none'
 const FLOATING = 'position:fixed;max-width:min(32rem,calc(100vw - 2rem));padding:.55rem .85rem;box-shadow:0 2px 10px rgba(0,0,0,.3)'
-const INLINE = 'position:relative;max-width:min(28rem,40vw);padding:.2rem .6rem;margin-left:.5rem;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+const INLINE = 'position:fixed;padding:.2rem .6rem;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+const GAP_PX = 8 // space between the download button and the chip
+const MIN_CHIP_PX = 120 // narrower than this the text isn't readable: use the fallback corner instead
 const SPINNER = 'flex:none;width:.9em;height:.9em;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:localeaf-spin .8s linear infinite'
 const MARGIN = '1rem'
 
@@ -17,7 +21,7 @@ let showTimer: number | undefined
 let current = ''
 let startedAt = 0
 let tick: number | undefined
-let settings: Pick<Settings, 'statusPosition' | 'statusX' | 'statusY'> = { statusPosition: 'bottom-left', statusX: -1, statusY: -1 }
+let settings: Pick<Settings, 'statusPosition' | 'statusFallbackPosition' | 'statusX' | 'statusY'> = { statusPosition: 'toolbar', statusFallbackPosition: 'bottom-left', statusX: -1, statusY: -1 }
 let onMoved: (x: number, y: number) => void = () => {}
 
 /** Placement settings, and where to report a drag (fractions of the window). */
@@ -32,14 +36,24 @@ function render() {
   text.textContent = `LocaLeaf — ${current}${s >= 2 ? ` · ${s}s` : ''}`
 }
 
-/** Overleaf's download button; the chip goes right after its toolbar item. */
-function toolbarAnchor(): Element | null {
-  const link = document.querySelector('a[aria-label="Download PDF"], button[aria-label="Download PDF"]')
-  if (!link) return null
-  // the direct child of the toolbar row that contains the link
-  let item: Element = link
-  while (item.parentElement && getComputedStyle(item.parentElement).display !== 'flex') item = item.parentElement
-  return item.parentElement ? item : null
+/** Where the chip goes in "toolbar" mode: right of Overleaf's download button, vertically centred on it, as wide
+ *  as the toolbar row leaves room for. Null when the button isn't there or has no usable box (UI changed). */
+function toolbarSlot(): { left: number; top: number; height: number; maxWidth: number } | null {
+  try {
+    const link = document.querySelector('a[aria-label="Download PDF"], button[aria-label="Download PDF"]')
+    const r = link?.getBoundingClientRect()
+    if (!r || r.width === 0 || r.height === 0) return null
+    // room to the right: the first box around the button (the PDF pane's toolbar) that leaves enough of it
+    const left = r.right + GAP_PX
+    let box = link!.parentElement
+    while (box && box.getBoundingClientRect().right - left < MIN_CHIP_PX) box = box.parentElement
+    if (!box) return null
+    const maxWidth = Math.min(box.getBoundingClientRect().right, innerWidth) - left - GAP_PX
+    if (maxWidth < MIN_CHIP_PX) return null
+    return { left, top: r.top + r.height / 2, height: r.height, maxWidth }
+  } catch {
+    return null
+  }
 }
 
 function corner(pos: StatusPosition): string {
@@ -47,19 +61,22 @@ function corner(pos: StatusPosition): string {
   return `${v}:${MARGIN};${hz}:${MARGIN}`
 }
 
+/** Puts the chip where the settings say; called again on resize and every second (the toolbar can move). */
 function place(chip: HTMLElement) {
-  const anchor = settings.statusPosition === 'toolbar' ? toolbarAnchor() : null
-  if (anchor) {
-    chip.style.cssText = `${BASE};${INLINE}`
-    anchor.after(chip)
+  if (!chip.isConnected) document.body.appendChild(chip)
+  if (chip.dataset.dragged) return
+  const slot = settings.statusPosition === 'toolbar' ? toolbarSlot() : null
+  if (slot) {
+    chip.style.cssText = `${BASE};${INLINE};left:${slot.left}px;max-width:${slot.maxWidth}px`
+    chip.style.top = `${slot.top - chip.getBoundingClientRect().height / 2}px`
     return
   }
-  document.body.appendChild(chip)
-  if (settings.statusPosition === 'custom' && settings.statusX >= 0 && settings.statusY >= 0) {
+  const pos = settings.statusPosition === 'toolbar' ? settings.statusFallbackPosition : settings.statusPosition
+  if (pos === 'custom' && settings.statusX >= 0 && settings.statusY >= 0) {
     chip.style.cssText = `${BASE};${FLOATING};left:0;top:0`
     moveTo(chip, settings.statusX * innerWidth, settings.statusY * innerHeight)
   } else {
-    chip.style.cssText = `${BASE};${FLOATING};${corner(settings.statusPosition)}`
+    chip.style.cssText = `${BASE};${FLOATING};${corner(pos === 'custom' ? settings.statusFallbackPosition : pos)}`
   }
 }
 
@@ -83,8 +100,7 @@ function makeDraggable(chip: HTMLElement) {
     const move = (e: PointerEvent) => {
       if (!moved) {
         moved = true
-        // leave the toolbar / corner: float where the pointer is
-        if (chip.parentElement !== document.body) document.body.appendChild(chip)
+        chip.dataset.dragged = '1' // stop the toolbar / corner placement from pulling it back
         chip.style.cssText = `${BASE};${FLOATING};left:${r.left}px;top:${r.top}px;cursor:grabbing`
       }
       moveTo(chip, e.clientX - dx, e.clientY - dy)
@@ -95,7 +111,8 @@ function makeDraggable(chip: HTMLElement) {
       chip.style.cursor = 'grab'
       if (!moved) return
       const b = chip.getBoundingClientRect()
-      settings = { statusPosition: 'custom', statusX: b.left / innerWidth, statusY: b.top / innerHeight }
+      settings = { ...settings, statusPosition: 'custom', statusX: b.left / innerWidth, statusY: b.top / innerHeight }
+      delete chip.dataset.dragged
       onMoved(settings.statusX, settings.statusY)
     }
     window.addEventListener('pointermove', move)
@@ -125,13 +142,27 @@ export function beginStatus(initial: string, delayMs: number) {
     render()
     place(el)
     makeDraggable(el)
-    tick = window.setInterval(render, 1000) // the elapsed time keeps moving even while one step takes long
+    // the elapsed time keeps moving even while one step takes long; the toolbar can move (panels resized)
+    tick = window.setInterval(() => { render(); if (el) place(el) }, 1000)
   }, delayMs)
 }
+
+window.addEventListener('resize', () => { if (el) place(el) })
 
 export function updateStatus(message: string) {
   current = message
   render()
+}
+
+/** Shows the chip for a moment where it will appear (after the position setting changed). If a compile is
+ *  running, its chip just moves there. */
+export function previewStatus(ms: number) {
+  if (el) {
+    place(el)
+    return
+  }
+  beginStatus('the progress indicator appears here', 0)
+  window.setTimeout(() => { if (current === 'the progress indicator appears here') finishStatus() }, ms)
 }
 
 export function finishStatus() {

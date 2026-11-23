@@ -1,10 +1,16 @@
 // Page → content script requests over window.postMessage.
 import { EXT_CHANNEL, PAGE_CHANNEL, type PageRequest } from '../shared/messages'
+import type { Settings } from '../shared/settings'
 
 let nextId = 0
 const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 
 const progressListeners: ((text: string) => void)[] = []
+const settingsListeners: ((s: Settings) => void)[] = []
+/** Settings changed in the popup while this tab is open. */
+export function onSettings(fn: (s: Settings) => void) {
+  settingsListeners.push(fn)
+}
 /** Engine progress (TeX passes, downloads, engine start) while a request runs. */
 export function onProgress(fn: (text: string) => void) {
   progressListeners.push(fn)
@@ -13,6 +19,7 @@ export function onProgress(fn: (text: string) => void) {
 window.addEventListener('message', event => {
   if (event.source !== window || event.data?.channel !== EXT_CHANNEL) return
   if (typeof event.data.progress === 'string') { for (const l of progressListeners) l(event.data.progress); return }
+  if (event.data.settings) { for (const l of settingsListeners) l(event.data.settings); return }
   const { id, ok, value, error } = event.data
   const w = waiting.get(id)
   if (!w) return

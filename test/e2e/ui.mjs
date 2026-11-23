@@ -14,6 +14,14 @@ const ART = join(ROOT, 'test/.artifacts')
 mkdirSync(ART, { recursive: true })
 const results = []
 let failures = 0
+/** The chip is right of Overleaf's download button and vertically centred on it. */
+async function nextToDownload(pg, chipLocator) {
+  const d = await pg.locator('[aria-label="Download PDF"]').first().boundingBox().catch(() => null)
+  const c = await chipLocator.boundingBox().catch(() => null)
+  if (!d || !c) return false
+  return c.x >= d.x + d.width && c.x - (d.x + d.width) < 40 && Math.abs((c.y + c.height / 2) - (d.y + d.height / 2)) < 4
+}
+
 const check = async (name, ok, detail = '') => {
   results.push({ check: name, result: ok ? 'ok' : 'FAIL', detail })
   h.step(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${String(detail).slice(0, 200)}` : ''}`)
@@ -43,12 +51,14 @@ try {
   h.track('popup', popup)
   await popup.setViewportSize({ width: 420, height: 900 })
   await popup.goto(`chrome-extension://${extId}/popup.html?tabId=${tabId}`)
-  await popup.locator('#stats .tile').first().waitFor()
+  await popup.locator('#stats .tile').nth(1).waitFor()
+  const now = await h.waitFor('the Now tile', async () => { const t = await popup.locator('#stats .tile.now').textContent(); return /Idle/.test(t ?? '') ? t : null })
+  await check('popup "Now" tile shows the tab is idle with the last result', /last compile: done.*local/.test(now), now)
   await popup.screenshot({ path: join(ART, 'ui-popup.png'), fullPage: true })
   const sw1 = popup.locator('#site input[type=checkbox]')
   await check('site switch is on (and locked: built in)', (await sw1.isChecked()) && (await sw1.isDisabled()))
   await check('project shows "Locally" selected', (await popup.locator('#project button[aria-pressed=true]').textContent()) === 'Locally')
-  const firstTile = await popup.locator('#stats .tile .n').first().textContent()
+  const firstTile = await popup.locator('#stats .tile:not(.now) .n').first().textContent()
   await check('statistics show the local compile', Number(firstTile) >= 1, firstTile ?? '')
   const groups = await popup.locator('#groups details summary').allTextContents()
   await check('settings are grouped, unknown ones under Advanced', groups.length >= 5 && groups.at(-1) === 'Advanced', groups.join(' | '))
@@ -57,16 +67,26 @@ try {
   await popup.emulateMedia({ colorScheme: 'dark' })
   await popup.screenshot({ path: join(ART, 'ui-popup-dark.png'), fullPage: true })
 
-  h.step('switching the project to the server in the popup')
-  await popup.locator('#project button:has-text("On the server")').click()
-  const modes = await h.waitFor('project mode stored', () => sw.evaluate(() => chrome.storage.local.get('projectModes').then(r => r.projectModes)))
-  await check('"On the server" stores the project mode', modes?.[projectId] === 'server', JSON.stringify(modes))
-  await sw.evaluate(() => chrome.storage.local.remove('projectModes'))
+  h.step('changing the position while the tab is open (no reload)')
+  // toolbar is the default, so go via another position to see a change
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { statusPosition: 'bottom-right', previewMs: 8000 } }))
+  await page.waitForTimeout(500)
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { statusPosition: 'toolbar', previewMs: 8000 } }))
+  const preview = page.locator('[role=status]:has-text("LocaLeaf")').first()
+  await preview.waitFor({ timeout: 5000 }).catch(() => undefined)
+  await check('a new position is previewed right away, next to the download button', await nextToDownload(page, preview))
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { statusPosition: 'top-right', previewMs: 8000 } }))
+  await page.waitForTimeout(500)
+  const box0 = await page.locator('[role=status]:has-text("LocaLeaf")').first().boundingBox()
+  const vp = page.viewportSize()
+  await check('switching to top-right moves it there', !!box0 && box0.y < vp.height / 4 && box0.x + box0.width > vp.width * 3 / 4, JSON.stringify(box0))
+  await page.screenshot({ path: join(ART, 'ui-chip-preview.png') })
+  await sw.evaluate(() => chrome.storage.local.remove('settings'))
 
   h.step('chip in the toolbar next to the download button')
   writeFileSync(join(slowDir, 'main.tex'), readFileSync(join(ROOT, 'test/e2e/projects/slow/main.tex'), 'utf8').replace('SPINCOUNT', String(readJson('config/test.json').spinCount)))
   const slowId = await uploadProject(setup, slowDir, `e2e-ui-slow-${Date.now()}`)
-  await sw.evaluate(() => chrome.storage.local.set({ settings: { statusPosition: 'toolbar', statusDelayMs: 0 } }))
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { statusDelayMs: 0 } })) // default position: toolbar
   const slow = await context.newPage()
   const slowLogs = h.track('slow', slow)
   await slow.goto(`${OVERLEAF_URL}/project/${slowId}`)
@@ -74,8 +94,24 @@ try {
   await chip.waitFor()
   await slow.waitForTimeout(1500)
   await slow.screenshot({ path: join(ART, 'ui-chip-toolbar.png') })
-  const inToolbar = await chip.evaluate(el => !!el.previousElementSibling?.querySelector('[aria-label="Download PDF"]') || el.previousElementSibling?.matches?.('[aria-label="Download PDF"]'))
-  await check('chip sits right after the download button', inToolbar)
+  const slowTab = await sw.evaluate(u => chrome.tabs.query({}).then(ts => ts.find(t => t.url?.startsWith(u))?.id), `${OVERLEAF_URL}/project/${slowId}`)
+  const popup2 = await context.newPage()
+  await popup2.setViewportSize({ width: 420, height: 700 })
+  await popup2.goto(`chrome-extension://${extId}/popup.html?tabId=${slowTab}`)
+  const nowCompiling = await h.waitFor('the Now tile during the compile', async () => { const t = await popup2.locator('#stats .tile.now').textContent(); return /Compiling/.test(t ?? '') ? t : null }).catch(() => '')
+  await check('popup "Now" tile shows the running compile', /Compiling.*TeX pass/.test(nowCompiling), nowCompiling)
+  await popup2.screenshot({ path: join(ART, 'ui-popup-compiling.png') })
+  await popup2.close()
+  await check('by default the chip sits right of the download button', await nextToDownload(slow, chip))
+
+  h.step('simulating an Overleaf UI change (download button not found)')
+  const errorsBefore = slowLogs.filter(l => l.includes('[pageerror]')).length
+  await slow.evaluate(() => document.querySelectorAll('[aria-label="Download PDF"]').forEach(e => e.removeAttribute('aria-label')))
+  await slow.waitForTimeout(1500) // the chip re-places itself every second
+  const fb = await chip.boundingBox()
+  const vp2 = slow.viewportSize()
+  await check('without the download button the chip falls back to bottom left', !!fb && fb.x < vp2.width / 4 && fb.y > vp2.height * 3 / 4, JSON.stringify(fb))
+  await check('and nothing throws in the page', slowLogs.filter(l => l.includes('[pageerror]')).length === errorsBefore)
 
   h.step('dragging the chip')
   const box = await chip.boundingBox()
@@ -89,6 +125,13 @@ try {
   await h.waitFor('slow compile to finish', () => slowLogs.find(l => /compiled .* locally|local compile failed/.test(l)))
   await check('chip is gone after the compile', (await slow.locator('[role=status]:has-text("LocaLeaf")').count()) === 0)
   await sw.evaluate(() => chrome.storage.local.remove('settings'))
+
+  h.step('switching the project to the server in the popup')
+  await popup.locator('#project button:has-text("On the server")').click()
+  const modes = await h.waitFor('project mode stored', () => sw.evaluate(() => chrome.storage.local.get('projectModes').then(r => r.projectModes)))
+  await check('"On the server" stores the project mode', modes?.[projectId] === 'server', JSON.stringify(modes))
+  await sw.evaluate(() => chrome.storage.local.remove('projectModes'))
+
 } catch (e) {
   await check('test ran to the end', false, String(e?.stack ?? e).slice(0, 800))
 } finally {

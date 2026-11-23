@@ -25,8 +25,11 @@ export interface Settings {
   localTimeoutSeconds: number
   statusDelayMs: number
   statusPosition: StatusPosition
+  statusFallbackPosition: StatusPosition
   statusX: number
   statusY: number
+  liveUpdateMs: number
+  previewMs: number
 }
 
 export type StatusPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'toolbar' | 'custom'

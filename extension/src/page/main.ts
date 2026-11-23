@@ -3,8 +3,9 @@
 import type { CompileOptions, CompileResult, Compiler } from '../engine/protocol'
 import type { CompileReply, HelloReply } from '../shared/messages'
 import type { Settings } from '../shared/settings'
-import { ext, getMeta, onProgress, whenDomReady } from './bridge'
-import { beginStatus, configureStatus, finishStatus, updateStatus } from './status'
+import { ext, getMeta, onProgress, onSettings, whenDomReady } from './bridge'
+import { beginStatus, configureStatus, finishStatus, previewStatus, updateStatus } from './status'
+import type { LiveState } from '../shared/messages'
 import { ProjectMirror } from './mirror'
 import { OUTPUT_PREFIX, OutputStore, compileResponse } from './outputs'
 import { installSocketHook, onEditorSocket, whenIo } from './socket-hook'
@@ -30,13 +31,49 @@ const clientId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(
 const store = new OutputStore(() => settings?.keepBuilds ?? 1)
 const helloDone = start()
 
-// Engine progress → indicator, and to the console (download percentages only every quarter).
+// What this tab is doing, for the popup's live "Now" tile. State changes go out at once, text-only updates at
+// most every settings.liveUpdateMs.
+let liveState: LiveState | null = null
+let liveTimer: number | undefined
+let livePending: string | null = null
+function live(state: LiveState, text: string) {
+  const send = (t: string) => ext({ type: 'live', state, text: t }).catch(() => undefined)
+  if (state !== liveState) {
+    liveState = state
+    clearTimeout(liveTimer)
+    liveTimer = undefined
+    livePending = null
+    send(text)
+    return
+  }
+  livePending = text
+  liveTimer ??= window.setTimeout(() => {
+    liveTimer = undefined
+    if (livePending !== null && liveState === state) send(livePending)
+    livePending = null
+  }, settings?.liveUpdateMs ?? 0)
+}
+
+// Engine progress → indicator, popup and console (download percentages only every quarter).
 onProgress(text => {
   updateStatus(text)
+  live('compiling', text)
   const pct = text.match(/\((\d+)%\)$/)
   if (!pct || Number(pct[1]) % 25 === 0) log(text)
 })
-const mirrorProgress = (text: string) => updateStatus(text)
+const mirrorProgress = (text: string) => {
+  updateStatus(text)
+  live(compiling ? 'compiling' : 'loading', text)
+}
+
+// Settings changed in the popup: apply now; a new chip position is shown for a moment.
+onSettings(next => {
+  const moved = next.statusPosition !== settings?.statusPosition || next.statusFallbackPosition !== settings?.statusFallbackPosition || next.statusX !== settings?.statusX || next.statusY !== settings?.statusY
+  settings = next
+  configureStatus(next, savePosition)
+  if (moved && mode === 'local') previewStatus(next.previewMs)
+})
+const savePosition = (x: number, y: number) => ext({ type: 'updateSettings', patch: { statusPosition: 'custom', statusX: x, statusY: y } }).catch(() => undefined)
 let lastCompile: { status: string; passes: string[]; errors: number; main: string; log: string; ms: number } | null = null
 
 // Debug hook (also handy in the browser console): what the last local compile did.
@@ -61,12 +98,19 @@ async function start() {
   const hello = await ext<HelloReply>({ type: 'hello', projectId })
   settings = hello.settings
   mode = hello.mode
-  configureStatus(settings, (x, y) => ext({ type: 'updateSettings', patch: { statusPosition: 'custom', statusX: x, statusY: y } }).catch(() => undefined))
+  configureStatus(settings, savePosition)
   log(`mode: ${mode}`)
-  if (mode !== 'local') return
+  if (mode !== 'local') {
+    live('off', 'this project compiles on the server (switched off for it)')
+    return
+  }
+  live('loading', 'loading the project')
   await whenIo()
   mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings, log, mirrorProgress)
-  mirror.ready.then(() => noticeTexLiveYear(hello.texliveYear), e => log('mirror failed to start', e))
+  mirror.ready.then(() => {
+    if (!compiling) live('idle', 'project loaded, ready to compile')
+    noticeTexLiveYear(hello.texliveYear)
+  }, e => { log('mirror failed to start', e); live('idle', `couldn't load the project: ${e?.message ?? e}`) })
 }
 
 window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -88,7 +132,7 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
   if (action === 'compile' && method === 'POST') {
     if (serverOnly) {
       const t = performance.now()
-      const res = await originalFetch(input, init)
+      const res = await serverCompile(input, init, serverOnly)
       ext({ type: 'status', state: 'fallback', detail: serverOnly, projectId, ms: performance.now() - t }).catch(() => undefined)
       return res
     }
@@ -119,6 +163,7 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
   const state = { stopped: false, abandoned: false }
   compiling = state
   beginStatus('compiling locally', settings?.statusDelayMs ?? 0)
+  live('compiling', 'compiling locally')
   // A local compile that runs past the limit is stopped and compiled on the server instead.
   const limitS = settings?.localTimeoutSeconds ?? 0
   let timer: number | undefined
@@ -135,6 +180,7 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
   } catch (e: any) {
     knownEpoch = null
     if (state.stopped) {
+      live('idle', 'compile stopped')
       log(`compile stopped after ${Math.round(performance.now() - t0)} ms`)
       return json({ status: 'terminated', outputFiles: [], pdfCachingMinChunkSize: 0, validationProblems: null })
     }
@@ -142,7 +188,7 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     if (settings?.fallbackToServer === false && !(e instanceof Fallback)) throw e
     ext({ type: 'status', state: 'fallback', detail: String(e?.message ?? e), projectId, ms: performance.now() - t0 }).catch(() => undefined)
     showToast(`Compiled on the server: ${e?.message ?? e}`, settings?.toastMs)
-    return originalFetch(input, init)
+    return serverCompile(input, init, String(e?.message ?? e))
   } finally {
     clearTimeout(timer)
     finishStatus()
@@ -177,6 +223,7 @@ async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t
     }
     const build = store.add(projectId, result)
     lastCompile = { status: result.status, passes: result.passes, errors: result.errors, main, ms: result.ms, log: new TextDecoder().decode(result.files['output.log'] ?? new Uint8Array()) }
+    live('idle', `last compile: ${result.status === 'success' ? 'done' : result.status}${result.errors ? `, ${result.errors} error${result.errors > 1 ? 's' : ''}` : ''}, ${(result.ms / 1000).toFixed(1)} s (local)`)
     log(`compiled ${main} locally: ${result.status}, ${result.passes.length} passes, engine ${Math.round(result.ms)} ms, total ${Math.round(performance.now() - t0)} ms${result.cached ? ' (unchanged)' : ''}`)
     ext({ type: 'status', state: 'local', detail: `last compile ${result.status} in ${(result.ms / 1000).toFixed(1)} s`, projectId, ms: performance.now() - t0, cached: result.cached }).catch(() => undefined)
     return json(compileResponse(store, build, result))
@@ -184,6 +231,17 @@ async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t
 }
 
 class Fallback extends Error {}
+
+/** The original compile request to the server, with the popup's live status following it. */
+async function serverCompile(input: RequestInfo | URL, init: RequestInit | undefined, why: string): Promise<Response> {
+  const t = performance.now()
+  live('server', `compiling on the server: ${why}`)
+  try {
+    return await originalFetch(input, init)
+  } finally {
+    live('idle', `last compile: on the server, ${((performance.now() - t) / 1000).toFixed(1)} s (${why})`)
+  }
+}
 
 /** Output can differ slightly between TeX Live releases: say so once if the project's server image isn't ours. */
 function noticeTexLiveYear(local: number) {

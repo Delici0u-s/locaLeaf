@@ -55,7 +55,13 @@ h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: .45rem; }
 .tile { border: 1px solid var(--line); border-radius: calc(var(--radius) - .15rem); padding: .4rem .5rem; }
 .tile .n { font-size: 1.25rem; font-weight: 650; line-height: 1.2; }
-.tile .l { color: var(--muted); font-size: .82em; }
+.tile .l { color: var(--muted); font-size: .82em; overflow-wrap: anywhere; }
+.tile.now { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.tile.now[data-state=compiling] .n, .tile.now[data-state=loading] .n { color: var(--green); }
+.tile.now[data-state=compiling] .n::after, .tile.now[data-state=loading] .n::after { content: ''; display: inline-block; width: .65em; height: .65em; margin-left: .4em; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: .05em; }
+.tile.now[data-state=server] .n { color: #b35c00; }
+.tile.now .n { font-size: 1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* settings */
 details { border-top: 1px solid var(--line); }

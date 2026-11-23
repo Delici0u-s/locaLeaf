@@ -1,6 +1,6 @@
 // Background service worker: offscreen engine lifecycle, per-origin script registration, badge.
 import { EMPTY_STATS, STORAGE_KEYS, getStored, mergeSettings, type CompileStats } from '../shared/settings'
-import type { BackgroundRequest } from '../shared/messages'
+import { liveKey, type BackgroundRequest } from '../shared/messages'
 import engineConfig from '../../../config/engine.json'
 
 const OFFSCREEN_URL = 'offscreen.html'
@@ -64,6 +64,8 @@ chrome.storage.onChanged.addListener(changes => {
   if (STORAGE_KEYS.origins in changes) registerScripts()
 })
 
+chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove(liveKey(tabId)) })
+
 // ---- compile statistics ----
 
 let statsWrite: Promise<void> = Promise.resolve()
@@ -109,6 +111,12 @@ chrome.runtime.onMessage.addListener((msg: BackgroundRequest, sender, sendRespon
     case 'getEngineConfig':
       engineConfigForOffscreen().then(sendResponse)
       return true
+    case 'live': {
+      const tabId = sender.tab?.id
+      if (tabId !== undefined) chrome.storage.session.set({ [liveKey(tabId)]: { state: msg.state, text: msg.text, at: Date.now() } })
+      sendResponse({ ok: true })
+      return false
+    }
     case 'status': {
       if (msg.projectId && typeof msg.ms === 'number' && msg.state !== 'idle') recordStats(msg.projectId, msg.state === 'local' ? 'local' : 'server', msg.ms)
       const tabId = sender.tab?.id

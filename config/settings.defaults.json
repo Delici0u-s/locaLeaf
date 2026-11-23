@@ -64,11 +64,17 @@
   "$localTimeoutSeconds": "A local compile (including loading the project and downloads) that takes longer than this is stopped and compiled on the server instead. 0 = no limit.",
   "statusDelayMs": 800,
   "$statusDelayMs": "Show the progress indicator in the page when a compile takes longer than this.",
-  "statusPosition": "bottom-left",
-  "$statusPosition": "Where the progress chip appears: a screen corner, 'toolbar' (next to Overleaf's download button), or 'custom' (where you dragged it).",
+  "statusPosition": "toolbar",
+  "$statusPosition": "Where the progress chip appears: 'toolbar' (next to Overleaf's download button; statusFallbackPosition if that isn't found), a screen corner, or 'custom' (where you dragged it).",
   "statusX": -1,
   "statusY": -1,
   "$statusX": "Dragged position of the chip as a fraction of the window width/height (-1: not dragged yet).",
   "serverOnShellEscape": true,
-  "$serverOnShellEscape": "Compile on the server if the document needs shell escape (minted, svg, gnuplot, …), which the local engine doesn't have."
+  "$serverOnShellEscape": "Compile on the server if the document needs shell escape (minted, svg, gnuplot, …), which the local engine doesn't have.",
+  "liveUpdateMs": 300,
+  "$liveUpdateMs": "How often the popup's live status may update while a compile reports progress.",
+  "previewMs": 2500,
+  "$previewMs": "How long the progress indicator is shown after changing its position.",
+  "statusFallbackPosition": "bottom-left",
+  "$statusFallbackPosition": "Corner used when the toolbar spot can't be found (e.g. Overleaf changed its layout)."
 }

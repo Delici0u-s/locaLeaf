@@ -5,8 +5,10 @@
       "title": "Progress indicator",
       "keys": [
         "statusPosition",
+        "statusFallbackPosition",
         "statusDelayMs",
-        "toastMs"
+        "toastMs",
+        "previewMs"
       ]
     },
     {
@@ -47,6 +49,10 @@
       "help": "Drag the chip in the page to place it freely.",
       "options": [
         [
+          "toolbar",
+          "Next to the download button"
+        ],
+        [
           "bottom-left",
           "Bottom left"
         ],
@@ -61,10 +67,6 @@
         [
           "top-right",
           "Top right"
-        ],
-        [
-          "toolbar",
-          "Next to the download button"
         ],
         [
           "custom",
@@ -142,6 +144,31 @@
       "label": "Keep downloads and converted fonts up to",
       "unit": "MB",
       "help": "Makes the first compile after a browser restart faster. 0: off."
+    },
+    "previewMs": {
+      "label": "Preview after moving it for",
+      "unit": "ms"
+    },
+    "statusFallbackPosition": {
+      "label": "If that spot isn't there",
+      "options": [
+        [
+          "bottom-left",
+          "Bottom left"
+        ],
+        [
+          "bottom-right",
+          "Bottom right"
+        ],
+        [
+          "top-left",
+          "Top left"
+        ],
+        [
+          "top-right",
+          "Top right"
+        ]
+      ]
     }
   }
 }

@@ -2,7 +2,7 @@
 // Page ⇄ here: window.postMessage (structured clone). Here ⇄ offscreen engine: runtime port (JSON, base64).
 import { fromBase64, toWire, wireSize } from '../shared/bytes'
 import { ENGINE_PORT, EXT_CHANNEL, PAGE_CHANNEL, type CompileReply, type EngineReply, type EngineRequest, type HelloReply, type PageRequest, type SyncPayload, type WireSync } from '../shared/messages'
-import { getStored, mergeSettings } from '../shared/settings'
+import { getStored, mergeSettings, type Settings } from '../shared/settings'
 import engineConfig from '../../../config/engine.json'
 
 let port: chrome.runtime.Port | null = null
@@ -85,6 +85,8 @@ async function handle(req: PageRequest): Promise<unknown> {
       const files = Object.fromEntries(Object.entries(r.result.files).map(([k, v]) => [k, fromBase64(v)]))
       return { kind: 'done', epoch: r.epoch, result: { ...r.result, files } } satisfies CompileReply
     }
+    case 'live':
+      return chrome.runtime.sendMessage({ type: 'live', state: req.state, text: req.text })
     case 'updateSettings': {
       const current = await getStored('settings')
       await chrome.storage.local.set({ settings: { ...current, ...req.patch } })
@@ -101,6 +103,12 @@ async function handle(req: PageRequest): Promise<unknown> {
       return chrome.runtime.sendMessage({ ...req, type: 'status' })
   }
 }
+
+// Settings changed in the popup: hand them to the page right away (no reload needed).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !('settings' in changes)) return
+  window.postMessage({ channel: EXT_CHANNEL, settings: mergeSettings(changes.settings.newValue as Partial<Settings> | undefined) }, window.location.origin)
+})
 
 window.addEventListener('message', event => {
   if (event.source !== window || event.data?.channel !== PAGE_CHANNEL) return

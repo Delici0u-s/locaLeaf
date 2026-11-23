@@ -3,6 +3,7 @@
 // config/settings.ui.json; anything not described there appears under "Advanced").
 import ui from '../../../config/settings.ui.json'
 import { DEFAULT_SETTINGS, getStored, mergeSettings, type CompileStats, type ProjectMode } from '../shared/settings'
+import { liveKey, type LiveStatus } from '../shared/messages'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {}, ...children: (Node | string)[]) => {
@@ -31,7 +32,7 @@ async function main() {
   renderEngine()
   await renderSite(origin, enabled, builtIn.includes(origin ?? ''), origins, tab?.id)
   if (enabled && projectId) await renderProject(projectId, tab?.id)
-  await renderStats(projectId)
+  await renderStats(projectId, enabled && !!projectId ? tab?.id : undefined)
   await renderSettings()
 }
 
@@ -132,27 +133,58 @@ async function renderProject(projectId: string, tabId?: number) {
   )
 }
 
-async function renderStats(projectId: string | null) {
+const LIVE_LABEL: Record<LiveStatus['state'], string> = {
+  loading: 'Loading', compiling: 'Compiling', server: 'On the server', idle: 'Idle', off: 'Off',
+}
+
+/** The tab's current activity, updated live while the popup is open. */
+function nowTile(tabId: number): HTMLElement {
+  const n = h('div', { class: 'n' }, '…')
+  const l = h('div', { class: 'l' }, 'waiting for the page')
+  const tile = h('div', { class: 'tile now' }, n, l)
+  const show = (s?: LiveStatus) => {
+    tile.dataset.state = s?.state ?? 'unknown'
+    n.textContent = s ? LIVE_LABEL[s.state] : 'No status'
+    l.textContent = s?.text ?? 'reload the Overleaf tab'
+  }
+  const key = liveKey(tabId)
+  chrome.storage.session.get(key).then(r => show(r[key] as LiveStatus | undefined))
+  chrome.storage.session.onChanged.addListener(changes => { if (key in changes) show(changes[key].newValue as LiveStatus | undefined) })
+  return tile
+}
+
+async function renderStats(projectId: string | null, liveTabId?: number) {
   const stats = await getStored('stats')
   const s = projectId ? stats.projects[projectId] : undefined
   const total = stats.total
-  if (!total || total.local + total.server === 0) return
+  const hasStats = !!total && total.local + total.server > 0
+  if (!hasStats && liveTabId === undefined) return
   const sec = (ms: number) => `${(ms / 1000).toFixed(ms >= 10_000 ? 0 : 1)} s`
   const ago = (t: number) => {
     const m = Math.round((Date.now() - t) / 60_000)
     return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`
   }
   const tile = (n: string, l: string) => h('div', { class: 'tile' }, h('div', { class: 'n' }, n), h('div', { class: 'l' }, l))
-  const tilesFor = (x: CompileStats) => h('div', { class: 'tiles' },
-    tile(String(x.local), x.local ? `local · avg ${sec(x.localMs / x.local)}` : 'local'),
-    tile(String(x.server), x.server ? `on the server · avg ${sec(x.serverMs / x.server)}` : 'on the server'),
-    tile(sec(x.lastMs), `last (${x.lastWhere === 'local' ? 'local' : 'server'}, ${ago(x.lastAt)})`),
-  )
+  const tilesFor = (x: CompileStats | undefined) => {
+    const tiles = h('div', { class: 'tiles' })
+    if (liveTabId !== undefined) tiles.append(nowTile(liveTabId))
+    if (x && x.local + x.server > 0) {
+      tiles.append(
+        tile(String(x.local), x.local ? `local · avg ${sec(x.localMs / x.local)}` : 'local'),
+        tile(String(x.server), x.server ? `on the server · avg ${sec(x.serverMs / x.server)}` : 'on the server'),
+        tile(sec(x.lastMs), `last (${x.lastWhere === 'local' ? 'local' : 'server'}, ${ago(x.lastAt)})`),
+      )
+    }
+    return tiles
+  }
   const el = $('stats')
   el.hidden = false
-  const parts: Node[] = [h('h2', {}, s && s.local + s.server > 0 ? 'This project' : 'Compiles')]
-  if (s && s.local + s.server > 0) parts.push(tilesFor(s), h('p', { class: 'muted' }, `All projects: ${total.local} local, ${total.server} on the server.`))
-  else parts.push(tilesFor(total))
+  const projectHas = !!s && s.local + s.server > 0
+  const parts: Node[] = [h('h2', {}, liveTabId !== undefined || projectHas ? 'This project' : 'Compiles')]
+  if (liveTabId !== undefined) {
+    parts.push(tilesFor(s))
+    if (hasStats) parts.push(h('p', { class: 'muted' }, `All projects: ${total.local} local, ${total.server} on the server.`))
+  } else parts.push(tilesFor(total))
   el.replaceChildren(...parts)
 }
 
@@ -212,7 +244,7 @@ async function renderSettings() {
   }
 
   $('groups').replaceChildren(...groups.filter(g => g.keys.length).map(g => h('details', {}, h('summary', {}, g.title), ...g.keys.map(field))))
-  $('groups').append(h('p', { class: 'muted' }, 'Changes apply when you reload the Overleaf tab (engine settings: when the engine restarts).'))
+  $('groups').append(h('p', { class: 'muted' }, 'Indicator settings apply right away; others when you reload the Overleaf tab (engine settings: when the engine restarts).'))
   $('reset').onclick = async () => {
     await chrome.storage.local.remove('settings')
     await renderSettings()
