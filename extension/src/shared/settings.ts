@@ -31,13 +31,17 @@ export interface Settings {
   liveUpdateMs: number
   previewMs: number
   engineStartTimeoutMs: number
+  raceWhileCold: boolean
+  raceHeadStartMs: number
 }
 
 export type StatusPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'toolbar' | 'custom'
 
 export type ProjectMode = 'local' | 'server'
 
-export const DEFAULT_SETTINGS: Settings = stripComments(defaults) as Settings
+const BUILD_OVERRIDES = typeof __SETTINGS_OVERRIDES__ === 'undefined' ? {} : (__SETTINGS_OVERRIDES__ as Partial<Settings>)
+const BASE = stripComments(defaults) as Settings
+export const DEFAULT_SETTINGS: Settings = { ...BASE, ...BUILD_OVERRIDES, engine: { ...BASE.engine, ...BUILD_OVERRIDES.engine } }
 
 export function mergeSettings(overrides: Partial<Settings> | undefined): Settings {
   return { ...DEFAULT_SETTINGS, ...overrides, engine: { ...DEFAULT_SETTINGS.engine, ...overrides?.engine } }

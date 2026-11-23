@@ -18,7 +18,9 @@
         "serverOnMissingPackages",
         "serverOnMissingFonts",
         "serverOnShellEscape",
-        "localTimeoutSeconds"
+        "localTimeoutSeconds",
+        "raceWhileCold",
+        "raceHeadStartMs"
       ]
     },
     {
@@ -137,6 +139,14 @@
     "engine.biberArgs": {
       "label": "Extra biber arguments",
       "help": "Comma separated."
+    },
+    "raceWhileCold": {
+      "label": "Race the server while warming up",
+      "help": "Until this tab's first local compile is done, the server compiles too and the first PDF wins. Afterwards: local only."
+    },
+    "raceHeadStartMs": {
+      "label": "…after the local compile had a head start of",
+      "unit": "ms"
     },
     "serverOnShellEscape": {
       "label": "…if the document needs shell escape",

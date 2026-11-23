@@ -10,6 +10,7 @@ import { ProjectMirror } from './mirror'
 import { OUTPUT_PREFIX, OutputStore, compileResponse } from './outputs'
 import { installSocketHook, onEditorSocket, whenIo } from './socket-hook'
 import { syncFromCode, syncFromPdf } from './synctex'
+import { raceCompiles } from './race'
 import { showToast } from './toast'
 
 const SUPPORTED: Compiler[] = ['pdflatex', 'xelatex', 'lualatex']
@@ -24,7 +25,13 @@ let mode: 'local' | 'server' = 'local'
 let projectId = ''
 let mirror: ProjectMirror | null = null
 let knownEpoch: number | null = null
-let compiling: { stopped: boolean } | null = null
+/** A local compile in progress. `server` is set while the server compiles the same request in a race. */
+interface LocalRun { stopped: boolean; abandoned: boolean; lost: boolean; server: AbortController | null }
+let compiling: LocalRun | null = null
+/** Set once a local compile finished in this tab: from then on compiles are local only (no race). */
+let localWarm = false
+/** Appended to the progress text while the server races the local compile. */
+let raceNote = ''
 /** Set when this project needs something only the server has (e.g. fonts); later compiles go there directly. */
 let serverOnly: string | null = null
 const clientId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
@@ -56,7 +63,7 @@ function live(state: LiveState, text: string) {
 
 // Engine progress → indicator, popup and console (download percentages only every quarter).
 onProgress(text => {
-  updateStatus(text)
+  updateStatus(text + raceNote)
   live('compiling', text)
   const pct = text.match(/\((\d+)%\)$/)
   if (!pct || Number(pct[1]) % 25 === 0) log(text)
@@ -140,10 +147,12 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
   }
   if (action === 'compile/stop' && method === 'POST' && compiling) {
     log('stop requested')
-    compiling.stopped = true
+    const run = compiling
+    run.stopped = true
     await ext({ type: 'stop' }).catch(() => undefined)
     knownEpoch = null
-    return json({})
+    // racing: the server is compiling the same request, stop it too
+    return run.server ? originalFetch(input, init) : json({})
   }
   if (action === 'output' && method === 'DELETE') {
     await ext({ type: 'clear', projectId }).catch(() => undefined)
@@ -160,7 +169,7 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
 async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const t0 = performance.now()
   const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}')
-  const state = { stopped: false, abandoned: false }
+  const state: LocalRun = { stopped: false, abandoned: false, lost: false, server: null }
   compiling = state
   beginStatus('compiling locally', settings?.statusDelayMs ?? 0)
   live('compiling', 'compiling locally')
@@ -175,8 +184,21 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
       reject(new Fallback(`the local compile took longer than ${limitS} s`))
     }, limitS * 1000)
   })
+  const local = Promise.race([compileLocally(state, t0, body), tooLong])
+  // the local compile may outlive this request (it lost a race and keeps warming up in the background)
+  const done = () => {
+    clearTimeout(timer)
+    if (compiling === state) compiling = null
+  }
+  local.then(done, done)
   try {
-    return await Promise.race([compileLocally(state, t0, body), tooLong])
+    // Until a local compile has finished in this tab (engine starting, first build, downloads), the server
+    // may race it; see settings.raceWhileCold.
+    if (!settings?.raceWhileCold || localWarm) return await local
+    const winner = await raceCompiles(local, () => raceServer(state, input, init), settings.raceHeadStartMs)
+    if (winner.from === 'local') stopRacingServer(state, init)
+    else serverWon(state, t0)
+    return winner.value
   } catch (e: any) {
     knownEpoch = null
     if (state.stopped) {
@@ -190,13 +212,45 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     showToast(`Compiled on the server: ${e?.message ?? e}`, settings?.toastMs)
     return serverCompile(input, init, String(e?.message ?? e))
   } finally {
-    clearTimeout(timer)
+    raceNote = ''
     finishStatus()
-    compiling = null
   }
 }
 
-async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t0: number, body: any): Promise<Response> {
+/** The server's side of a race: the original request, abortable if the local compile wins. */
+async function raceServer(state: LocalRun, input: RequestInfo | URL, init: RequestInit | undefined): Promise<Response> {
+  const controller = new AbortController()
+  state.server = controller
+  raceNote = ' · also on the server'
+  updateStatus('compiling locally · also on the server')
+  live('compiling', 'LocaLeaf is warming up: compiling locally and on the server, whichever is first')
+  log(`local compile not done after ${settings?.raceHeadStartMs} ms while warming up: compiling on the server too`)
+  const signal = init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal
+  const res = await originalFetch(input, { ...init, signal })
+  if (!res.ok) throw new Error(`the server answered ${res.status}`)
+  return res
+}
+
+/** The local compile won the race: the server needn't finish. */
+function stopRacingServer(state: LocalRun, init: RequestInit | undefined) {
+  if (!state.server) return
+  state.server.abort()
+  state.server = null
+  log('local compile was first: stopping the server compile')
+  originalFetch(`/project/${projectId}/compile/stop`, { method: 'POST', headers: init?.headers }).catch(() => undefined)
+}
+
+/** The server won the race: its PDF is shown; the local compile keeps going to get fast compiles ready. */
+function serverWon(state: LocalRun, t0: number) {
+  state.lost = true
+  state.server = null
+  const ms = performance.now() - t0
+  log(`the server was first (${Math.round(ms)} ms) while LocaLeaf warms up; the local compile continues in the background`)
+  ext({ type: 'status', state: 'fallback', detail: 'the server was faster while LocaLeaf warmed up', projectId, ms }).catch(() => undefined)
+  live('compiling', 'PDF from the server; getting fast local compiles ready in the background')
+}
+
+async function compileLocally(state: LocalRun, t0: number, body: any): Promise<Response> {
   {
     // A mirror that failed to start or lost its connection (server hiccup, idle disconnect) is reconnected
     // before anything waits on it.
@@ -225,7 +279,14 @@ async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t
       throw new Fallback(serverOnly)
     }
     const build = store.add(projectId, result)
+    localWarm = true
     lastCompile = { status: result.status, passes: result.passes, errors: result.errors, main, ms: result.ms, log: new TextDecoder().decode(result.files['output.log'] ?? new Uint8Array()) }
+    if (state.lost) {
+      // the server's PDF is already shown; this build only warmed the engine up
+      log(`local build of ${main} finished in the background: ${result.status}, ${result.passes.length} passes, ${Math.round(performance.now() - t0)} ms; compiles are local from now on`)
+      if (!compiling || compiling === state) live('idle', 'fast local compiles ready (the first PDF came from the server)')
+      return json(compileResponse(store, build, result))
+    }
     live('idle', `last compile: ${result.status === 'success' ? 'done' : result.status}${result.errors ? `, ${result.errors} error${result.errors > 1 ? 's' : ''}` : ''}, ${(result.ms / 1000).toFixed(1)} s (local)`)
     log(`compiled ${main} locally: ${result.status}, ${result.passes.length} passes, engine ${Math.round(result.ms)} ms, total ${Math.round(performance.now() - t0)} ms${result.cached ? ' (unchanged)' : ''}`)
     ext({ type: 'status', state: 'local', detail: `last compile ${result.status} in ${(result.ms / 1000).toFixed(1)} s`, projectId, ms: performance.now() - t0, cached: result.cached }).catch(() => undefined)

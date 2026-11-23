@@ -32,7 +32,10 @@ mkdirSync(DIST, { recursive: true })
 
 // Test-only hooks (simulating an engine crash) exist only in test builds: OLR_TEST_HOOKS=1.
 const TEST_HOOKS = process.env.OLR_TEST_HOOKS === '1'
-const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'none', define: { __TEST_HOOKS__: String(TEST_HOOKS) } }
+// Test builds also change some setting defaults (config/test.json "extensionDefaults"), e.g. so tests that
+// check local-only compiling aren't raced by the server; a test that needs the real default sets it.
+const settingsOverrides = TEST_HOOKS ? readJson('config/test.json').extensionDefaults ?? {} : {}
+const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'none', define: { __TEST_HOOKS__: String(TEST_HOOKS), __SETTINGS_OVERRIDES__: JSON.stringify(settingsOverrides) } }
 await Promise.all([
   build({ ...common, entryPoints: [join(SRC, 'background/background.ts')], outfile: join(DIST, 'background.js'), format: 'esm' }),
   build({ ...common, entryPoints: [join(SRC, 'content/content.ts')], outfile: join(DIST, 'content.js'), format: 'iife' }),

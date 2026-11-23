@@ -8,6 +8,7 @@
     "default": 600000,
     "e2e-history-ot": 600000,
     "e2e-stop": 600000,
+    "e2e-race": 600000,
     "e2e-any-site": 300000,
     "e2e-ui": 420000
   },
@@ -17,6 +18,8 @@
     "e2e-extremes": 420000,
     "engine": 300000
   },
+  "extensionDefaults": { "raceWhileCold": false },
+  "$extensionDefaults": "Setting defaults in test builds (dist-test): most e2e tests check that compiles stay local, so the warm-up race with the server is off unless a test turns it on (test/e2e/race.mjs).",
   "preflightMs": 10000,
   "pdfTextMs": 60000,
   "$pdfTextMs": "How long a test waits for a text to appear in the rendered PDF.",

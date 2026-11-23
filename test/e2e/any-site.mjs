@@ -42,7 +42,8 @@ try {
   await before.close()
 
   h.step('enabling the site like the popup does')
-  await sw.evaluate(o => chrome.storage.local.set({ origins: [o] }), origin)
+  // this is a production build (warm-up race on by default); the test checks a local compile, so no race
+  await sw.evaluate(o => chrome.storage.local.set({ origins: [o], settings: { raceWhileCold: false } }), origin)
   await h.waitFor('content scripts registered', () => sw.evaluate(() => chrome.scripting.getRegisteredContentScripts().then(s => s.length > 0)))
 
   const page = await context.newPage()

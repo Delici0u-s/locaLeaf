@@ -45,6 +45,9 @@
 - [x] Per-project build state across restarts (`engine.persistBuildMB`): first compile after reopening is
   incremental (book: 30 s / 5 passes → 13 s / 2 passes), instant when nothing changed.
 - [x] Restart-engine button in the popup.
+- [x] Warm-up race (`raceWhileCold`): until a tab's first local compile finishes, a compile not done within
+  `raceHeadStartMs` also goes to the server and the first PDF wins; the local build finishes in the background,
+  then compiles are local only. The losing server compile is stopped. e2e: `test/e2e/race.mjs`.
 - [x] Packaged release: `npm run package` → `release/localeaf-<version>.zip` (no personal sites in it).
 - [x] Faster first compile with non-bundled fonts: converted LuaTeX font caches and package-server files are
   kept in IndexedDB across engine restarts (`engine.persistCacheMB`). LuaLaTeX with Fira Sans: first compile of a

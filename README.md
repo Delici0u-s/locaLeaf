@@ -65,6 +65,10 @@ Per project you can switch between compiling *locally* and *on the server* in th
 The first compile after opening a project takes a few seconds longer, because the extension loads the whole
 project and starts the engine. LocaLeaf keeps each project's last build, so even that first compile only redoes
 what changed since last time, and a project you didn't change shows its PDF right away.
+While a tab is still warming up (engine starting, first build of a project, packages or fonts downloading), a
+local compile that isn't done after 2 s is also sent to the server, and whichever PDF comes first is shown. The
+local compile keeps going in the background; after it, compiles in that tab are local only
+(`raceWhileCold`, `raceHeadStartMs`).
 
 ## What goes over the network
 
@@ -123,6 +127,8 @@ The popup lists every setting with its current value. Defaults live in
 | `fallbackToServer` | true | Compile on the server if a local compile can't run |
 | `serverOnMissingFonts` | true | Compile on the server if fonts can't be provided locally |
 | `serverOnMissingPackages` | true | Compile on the server if TeX Live packages can't be provided locally |
+| `raceWhileCold` | true | Until a tab's first local compile is done, the server compiles too and the first PDF wins |
+| `raceHeadStartMs` | 2000 | How long the local compile runs alone before the server joins the race |
 
 ## Limitations
 

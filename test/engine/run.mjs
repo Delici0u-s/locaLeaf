@@ -138,8 +138,10 @@ try {
     // one line different from the saved build: incremental
     await page.evaluate(([f]) => window.engine.sync('fixture:lshort', f, { reset: true }), [files])
     const r = await page.evaluate(([o]) => window.engine.compile('fixture:lshort', o), [{ main: fx.main, compiler: fx.compiler, draft: false, stopOnFirstError: false }])
+    // the property is fewer TeX passes than a cold build (time alone varies with machine load)
     const firstS = parseFloat(bookCase.first)
-    const ok = r.status === 'success' && r.passes.filter(p => p.includes('latex')).length <= 2 && r.ms / 1000 < firstS / 2
+    const firstPasses = Number(bookCase.first.match(/(\d+)p$/)?.[1])
+    const ok = r.status === 'success' && r.passes.filter(p => p.includes('latex')).length <= 2 && r.passes.length < firstPasses && r.ms / 1000 < firstS
     if (!ok) failed++
     results.push({ case: 'restart keeps build', result: ok ? 'ok' : 'FAIL', first: `${(r.ms / 1000).toFixed(2)}s/${r.passes.length}p`, unchanged: '', edit: '', status: r.status, errors: r.errors })
     if (!ok) console.log(`FAIL restart keeps build: ${r.passes.join(' → ')}, ${(r.ms / 1000).toFixed(1)} s vs first ${firstS} s`)
