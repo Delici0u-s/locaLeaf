@@ -12,10 +12,10 @@ await preflight(OVERLEAF_URL)
 const TIMEOUT = h.stepMs
 const results = []
 let failures = 0
-const check = (name, ok, detail = '') => {
+const check = async (name, ok, detail = '') => {
   results.push({ check: name, result: ok ? 'ok' : 'FAIL', detail })
-  if (!ok) failures++
   h.step(`${ok ? 'ok  ' : 'FAIL'} ${name}`)
+  if (!ok) { failures++; await h.saveArtifacts(`check failed: ${name}`) }
 }
 
 const { context, close } = await launch({ extensionDir: join(ROOT, 'dist') })
@@ -77,16 +77,16 @@ try {
   const t0 = Date.now()
   await page.goto(`${OVERLEAF_URL}/project/${projectId}`)
   const first = await con.waitFor(/compiled .* locally|local compile failed/)
-  check('compile on load is local', /compiled main\.tex locally: success/.test(first), first)
-  check('PDF from the local build is shown', await waitForPdfText(page, 'MARKER-SECOND-ORIGINAL'), `${Date.now() - t0} ms from navigation`)
+  await check('compile on load is local', /compiled main\.tex locally: success/.test(first), first)
+  await check('PDF from the local build is shown', await waitForPdfText(page, 'MARKER-SECOND-ORIGINAL'), `${Date.now() - t0} ms from navigation`)
 
   // 2. Editing the open file and recompiling shows the change.
   const n2 = con.lines.length
   await typeAtEndOfLine(page, 'This paragraph comes from the main file.', ' EDITEDINMAIN.')
   await recompile(page)
   const second = await con.waitFor(/compiled .* locally|local compile failed/, n2)
-  check('edit + recompile is local', /locally: success/.test(second), second)
-  check('edit appears in the PDF', await waitForPdfText(page, 'EDITEDINMAIN'))
+  await check('edit + recompile is local', /locally: success/.test(second), second)
+  await check('edit appears in the PDF', await waitForPdfText(page, 'EDITEDINMAIN'))
 
   // 3. A change to another file, made in a second tab (like a collaborator), reaches the local build.
   const tab2 = await context.newPage()
@@ -100,8 +100,8 @@ try {
   const n3 = con.lines.length
   await recompile(page)
   const third = await con.waitFor(/compiled .* locally|local compile failed/, n3)
-  check('recompile after a collaborator edit is local', /locally: success/.test(third), third)
-  check("collaborator's edit to a non-open file is in the PDF", await waitForPdfText(page, 'COLLABEDIT'))
+  await check('recompile after a collaborator edit is local', /locally: success/.test(third), third)
+  await check("collaborator's edit to a non-open file is in the PDF", await waitForPdfText(page, 'COLLABEDIT'))
 
   // 4. SyncTeX both ways, through the same endpoints Overleaf's UI calls.
   const sync = await page.evaluate(async id => {
@@ -111,23 +111,25 @@ try {
     const back = p ? await (await fetch(`/project/${id}/sync/pdf?page=${p.page}&h=${p.h + p.width / 2}&v=${p.v - p.height / 2}&clsiserverid=olr-local`)).json() : null
     return { code, back }
   }, projectId)
-  check('SyncTeX code → PDF', sync.code.pdf?.length > 0, JSON.stringify(sync.code.pdf?.[0]))
-  check('SyncTeX PDF → code', sync.back?.code?.[0]?.file === 'main.tex' && Math.abs(sync.back.code[0].line - 7) <= 1, JSON.stringify(sync.back?.code))
+  await check('SyncTeX code → PDF', sync.code.pdf?.length > 0, JSON.stringify(sync.code.pdf?.[0]))
+  await check('SyncTeX PDF → code', sync.back?.code?.[0]?.file === 'main.tex' && Math.abs(sync.back.code[0].line - 7) <= 1, JSON.stringify(sync.back?.code))
 
   // 5. The download button gets the local PDF.
   const download = await page.locator('a[aria-label="Download PDF"]').first().getAttribute('href')
-  check('download button points at the local PDF', !!download?.startsWith('blob:'), download ?? '')
+  await check('download button points at the local PDF', !!download?.startsWith('blob:'), download ?? '')
 
   // 6. A TeX error shows up in Overleaf's log pane and as a marker in the editor (and still gives a PDF).
   const n6 = con.lines.length
   await typeAtEndOfLine(page, 'This paragraph comes from the main file.', ' \\undefinedcommandhere')
   await recompile(page)
   const errored = await con.waitFor(/compiled .* locally|local compile failed/, n6)
-  check('compile with an error still produces a PDF', /locally: success/.test(errored), errored)
+  await check('compile with an error still produces a PDF', /locally: success/.test(errored), errored)
   const errorsButton = page.locator('button:has-text("Errors")').first()
   if (!(await errorsButton.isVisible())) await page.locator('button[aria-label="View logs"]').first().click()
-  check('log pane counts the error', /Errors\s*1/.test((await errorsButton.textContent()) ?? ''), (await errorsButton.textContent()) ?? '')
-  check('error is marked in the editor', (await page.locator('.cm-lint-marker-error').count()) > 0 && (await page.locator('.cm-lintRange-error').count()) > 0)
+  await check('log pane counts the error', /Errors\s*1/.test((await errorsButton.textContent()) ?? ''), (await errorsButton.textContent()) ?? '')
+  // Overleaf adds the editor markers after it has parsed the log, so wait for them.
+  const marked = await h.waitFor('error markers in the editor', async () => (await page.locator('.cm-lint-marker-error').count()) > 0 && (await page.locator('.cm-lintRange-error').count()) > 0, h.pdfTextMs).then(() => true, () => false)
+  await check('error is marked in the editor', marked)
 
   // 7. "Clear cached files" then Recompile rebuilds from scratch (more than one pass).
   const n7 = con.lines.length
@@ -135,13 +137,13 @@ try {
   await page.waitForTimeout(500)
   await recompile(page)
   const fresh = await con.waitFor(/compiled .* locally|local compile failed/, n7)
-  check('recompile after clearing the cache is a full local build', /locally: success, ([2-9]|\d\d) passes/.test(fresh), fresh)
+  await check('recompile after clearing the cache is a full local build', /locally: success, ([2-9]|\d\d) passes/.test(fresh), fresh)
 
   // 8. Nothing was compiled on the server.
-  check('no compile request reached the server', serverCompiles.length === 0, serverCompiles.join(', '))
+  await check('no compile request reached the server', serverCompiles.length === 0, serverCompiles.join(', '))
   await tab2.close()
 } catch (e) {
-  check('test ran to the end', false, String(e?.stack ?? e).slice(0, 2000))
+  await check('test ran to the end', false, String(e?.stack ?? e).slice(0, 2000))
   await h.saveArtifacts(String(e?.stack ?? e))
 } finally {
   await close()

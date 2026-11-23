@@ -19,6 +19,8 @@ let ready: Promise<void> = Promise.resolve()
 let pending: { resolve: (m: FromWorker) => void; reject: (e: Error) => void } | null = null
 let queue: Promise<unknown> = Promise.resolve()
 let compileId = 0
+/** Bumped by stop(): compiles queued before the stop are dropped instead of run on the new worker. */
+let generation = 0
 /** Which page last synced each project: diffs from another page (second tab) need a full snapshot first. */
 const lastClient = new Map<string, string>()
 
@@ -50,13 +52,14 @@ function call(msg: ToWorker, transfer: Transferable[] = []): Promise<FromWorker>
   })
 }
 
-async function handle(req: EngineRequest): Promise<EngineReply> {
+async function handle(req: EngineRequest, gen: number): Promise<EngineReply> {
   try {
     await ready
   } catch {
     startWorker() // a failed init gets one fresh attempt per request
     await ready
   }
+  if (req.type === 'compile' && gen !== generation) throw new Error('compile stopped')
   switch (req.type) {
     case 'sync': {
       if (!req.sync.reset && ((req.expectEpoch !== null && req.expectEpoch !== epoch) || lastClient.get(req.projectId) !== req.clientId)) {
@@ -89,6 +92,7 @@ async function handle(req: EngineRequest): Promise<EngineReply> {
 
 /** Stopping can't wait in the queue (a compile is blocking it): restart the worker right away. */
 function stop() {
+  generation++
   const p = pending
   pending = null
   p?.reject(new Error('compile stopped'))
@@ -117,7 +121,8 @@ chrome.runtime.onConnect.addListener(port => {
       reply({ ok: true, value: { kind: 'ok' } })
       return
     }
-    const run = queue.then(() => handle(req))
+    const gen = generation
+    const run = queue.then(() => handle(req, gen))
     queue = run.catch(() => undefined)
     run.then(value => reply({ ok: true, value }), err => reply({ ok: false, error: String(err?.message ?? err) }))
   })

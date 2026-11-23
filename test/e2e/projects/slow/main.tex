@@ -1,0 +1,7 @@
+\documentclass{article}
+\begin{document}
+% Busy loop so a compile runs long enough to be stopped (the count is set by the e2e test).
+\newcount\n \n=0
+\loop\advance\n by 1 \ifnum\n<SPINCOUNT\repeat
+Finished spinning. SLOWDONE.
+\end{document}

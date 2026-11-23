@@ -76,6 +76,7 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Pr
     return handleCompile(input, init)
   }
   if (action === 'compile/stop' && method === 'POST' && compiling) {
+    log('stop requested')
     compiling.stopped = true
     await ext({ type: 'stop' }).catch(() => undefined)
     knownEpoch = null
@@ -108,6 +109,7 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     await barrier()
     const options: CompileOptions = { main, compiler, draft: !!body.draft, stopOnFirstError: !!body.stopOnFirstError }
     const result = await compileWithEngine(options)
+    if (state.stopped) throw new Error('stopped') // finished anyway (e.g. it was still queued): discard it
     if (result.missingFonts.length && settings?.serverOnMissingFonts) {
       serverOnly = `fonts not available locally: ${result.missingFonts.join(', ')}`
       throw new Fallback(serverOnly)
@@ -123,7 +125,10 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
     return json(compileResponse(store, build, result))
   } catch (e: any) {
     knownEpoch = null
-    if (state.stopped) return json({ status: 'terminated', outputFiles: [], pdfCachingMinChunkSize: 0, validationProblems: null })
+    if (state.stopped) {
+      log(`compile stopped after ${Math.round(performance.now() - t0)} ms`)
+      return json({ status: 'terminated', outputFiles: [], pdfCachingMinChunkSize: 0, validationProblems: null })
+    }
     log('local compile failed:', e)
     if (settings?.fallbackToServer === false && !(e instanceof Fallback)) throw e
     ext({ type: 'status', state: 'fallback', detail: String(e?.message ?? e) }).catch(() => undefined)

@@ -6,6 +6,8 @@ import { getStored, mergeSettings } from '../shared/settings'
 import engineConfig from '../../../config/engine.json'
 
 let port: chrome.runtime.Port | null = null
+/** Set by a stop request: the running compile (sync steps, then compile) must not send its next step. */
+let stopRequested = false
 let nextId = 0
 const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 
@@ -67,17 +69,20 @@ async function handle(req: PageRequest): Promise<unknown> {
       return { settings: await settings(), mode: modes[req.projectId] ?? 'local', texliveYear: engineConfig.texliveYear } satisfies HelloReply
     }
     case 'compile': {
+      stopRequested = false
       const s = await settings()
       for (const chunk of chunkSync(req.sync, s.maxSyncChunkBytes)) {
         const r = await engine({ type: 'sync', projectId: req.projectId, clientId: req.clientId, sync: chunk, expectEpoch: req.expectEpoch })
         if (r.kind === 'epochMismatch') return { kind: 'epochMismatch', epoch: r.epoch } satisfies CompileReply
       }
+      if (stopRequested) throw new Error('compile stopped')
       const r = await engine({ type: 'compile', projectId: req.projectId, options: req.options })
       if (r.kind !== 'compiled') throw new Error(`unexpected engine reply ${r.kind}`)
       const files = Object.fromEntries(Object.entries(r.result.files).map(([k, v]) => [k, fromBase64(v)]))
       return { kind: 'done', epoch: r.epoch, result: { ...r.result, files } } satisfies CompileReply
     }
     case 'stop':
+      stopRequested = true
       return engine({ type: 'stop' })
     case 'clear':
       return engine({ type: 'clear', projectId: req.projectId })

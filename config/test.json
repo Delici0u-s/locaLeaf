@@ -6,7 +6,8 @@
     "e2e-extremes": 1200000,
     "engine": 1800000,
     "default": 600000,
-    "e2e-history-ot": 600000
+    "e2e-history-ot": 600000,
+    "e2e-stop": 600000
   },
   "step": {
     "default": 180000,
@@ -16,5 +17,9 @@
   },
   "preflightMs": 10000,
   "pdfTextMs": 60000,
-  "$pdfTextMs": "How long a test waits for a text to appear in the rendered PDF."
+  "$pdfTextMs": "How long a test waits for a text to appear in the rendered PDF.",
+  "spinCount": 30000000,
+  "$spinCount": "Busy-loop iterations in test/e2e/projects/slow (about 10 s per TeX pass in WASM), so a compile can be stopped.",
+  "stopMaxMs": 8000,
+  "$stopMaxMs": "A stopped compile must end within this (the slow test document runs ~20 s if not stopped)."
 }

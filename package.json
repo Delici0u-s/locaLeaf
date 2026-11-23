@@ -14,14 +14,16 @@
     "test:e2e": "node test/e2e/run.mjs",
     "test:e2e:extremes": "node test/e2e/extremes.mjs",
     "test:e2e:fixtures": "node test/e2e/fixtures.mjs",
-    "test:all": "npm run -s typecheck && npm run -s test:unit && npm run -s test:engine && npm run -s test:e2e && npm run -s test:e2e:history-ot && npm run -s test:e2e:extremes && npm run -s test:e2e:fixtures",
-    "test:e2e:history-ot": "node test/e2e/history-ot.mjs"
+    "test:all": "npm run -s typecheck && npm run -s test:unit && npm run -s test:engine && npm run -s test:e2e && npm run -s test:e2e:history-ot && npm run -s test:e2e:stop && npm run -s test:e2e:extremes && npm run -s test:e2e:fixtures",
+    "test:e2e:history-ot": "node test/e2e/history-ot.mjs",
+    "test:e2e:stop": "node test/e2e/stop.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",
     "esbuild": "^0.28.2",
     "playwright-core": "^1.65.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "xz-decompress": "^0.2.3"
   }
 }
