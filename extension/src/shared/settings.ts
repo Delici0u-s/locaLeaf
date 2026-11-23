@@ -18,6 +18,7 @@ export interface Settings {
   joinRetries: number
   joinRetryDelayMs: number
   maxRetryAfterMs: number
+  serverOnMissingPackages: boolean
 }
 
 export type ProjectMode = 'local' | 'server'

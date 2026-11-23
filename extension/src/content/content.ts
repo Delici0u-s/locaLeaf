@@ -3,6 +3,7 @@
 import { fromBase64, toWire, wireSize } from '../shared/bytes'
 import { ENGINE_PORT, EXT_CHANNEL, PAGE_CHANNEL, type CompileReply, type EngineReply, type EngineRequest, type HelloReply, type PageRequest, type SyncPayload, type WireSync } from '../shared/messages'
 import { getStored, mergeSettings } from '../shared/settings'
+import engineConfig from '../../../config/engine.json'
 
 let port: chrome.runtime.Port | null = null
 let nextId = 0
@@ -63,7 +64,7 @@ async function handle(req: PageRequest): Promise<unknown> {
     case 'hello': {
       const modes = await getStored('projectModes')
       enginePort().catch(() => undefined) // start the engine early: it takes a few seconds
-      return { settings: await settings(), mode: modes[req.projectId] ?? 'local' } satisfies HelloReply
+      return { settings: await settings(), mode: modes[req.projectId] ?? 'local', texliveYear: engineConfig.texliveYear } satisfies HelloReply
     }
     case 'compile': {
       const s = await settings()

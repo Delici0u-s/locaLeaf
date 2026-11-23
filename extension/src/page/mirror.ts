@@ -10,7 +10,15 @@ import { connectOwn, type IoSocket } from './socket-hook'
 
 interface Folder { _id: string; name: string; docs?: { _id: string; name: string }[]; fileRefs?: { _id: string; name: string; hash?: string }[]; folders?: Folder[] }
 interface Entity { id: string; name: string; kind: 'doc' | 'file' | 'folder'; parent: string | null; hash?: string }
-interface DocState { text: string; version: number; type: string; rev: number; refetch?: number }
+interface DocState {
+  text: string
+  version: number
+  type: string
+  rev: number
+  /** history-ot: an update arrived but the new text hasn't been fetched yet. */
+  stale?: boolean
+  refetch?: number
+}
 
 export interface ProjectInfo { compiler: string; imageName?: string; rootDoc_id?: string; name?: string }
 
@@ -129,10 +137,11 @@ export class ProjectMirror {
     if (u.v > d.version) { this.log(`gap in ${u.doc} (have v${d.version}, got v${u.v}), rejoining`); this.rejoin(u.doc); return }
     d.version = u.v + 1
     if (d.type === 'history-ot') {
-      // We don't carry Overleaf's history-ot implementation; fetch the doc again shortly instead.
+      // We don't carry Overleaf's history-ot implementation; fetch the doc again shortly instead
+      // (debounced while someone types). Until then the doc is stale and the compile barrier waits.
+      d.stale = true
       clearTimeout(d.refetch)
       d.refetch = window.setTimeout(() => this.rejoin(u.doc), this.settings.historyOtRefetchMs)
-      d.rev++
       return
     }
     try {
@@ -189,12 +198,26 @@ export class ProjectMirror {
     return e ? parts.join('/') : null
   }
 
+  /** Doc OT types by path (debugging/tests). */
+  docTypes(): Record<string, string> {
+    return Object.fromEntries([...this.docs].map(([id, d]) => [this.pathOf(id) ?? id, d.type]))
+  }
+
   docVersion(id: string): number | undefined {
     return this.docs.get(id)?.version
   }
 
   hasDoc(id: string): boolean {
     return this.docs.has(id)
+  }
+
+  /** Fetches every stale history-ot doc now instead of after the debounce. */
+  async settle(): Promise<void> {
+    const stale = [...this.docs].filter(([, d]) => d.stale)
+    await Promise.all(stale.map(([id, d]) => {
+      clearTimeout(d.refetch)
+      return this.refreshDoc(id)
+    }))
   }
 
   /** Re-fetches one doc (used when the editor is ahead and the op never arrived). */

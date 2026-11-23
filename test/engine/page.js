@@ -41,7 +41,7 @@ window.engine = {
     window.lastFiles = res.files // raw outputs, for debugging from Playwright
     const log = res.files['output.log'] ? new TextDecoder().decode(res.files['output.log']) : ''
     return {
-      status: res.status, errors: res.errors, missingFonts: res.missingFonts, passes: res.passes, ms: res.ms, cached: res.cached,
+      status: res.status, errors: res.errors, missingFonts: res.missingFonts, missingPackages: res.missingPackages, passes: res.passes, ms: res.ms, cached: res.cached,
       pdfBytes: res.files['output.pdf']?.byteLength ?? 0, synctexBytes: res.files['output.synctex.gz']?.byteLength ?? 0,
       files: Object.keys(res.files), log, message: res.message,
     }

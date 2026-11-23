@@ -71,6 +71,8 @@ try {
     if (first.status === 'success' && !first.synctexBytes) problems.push('no synctex')
     if (e.missingFonts === 'none' && first.missingFonts.length) problems.push(`missing fonts: ${first.missingFonts.join(', ')}`)
     if (e.missingFonts === 'some' && !first.missingFonts.length) problems.push('expected missing fonts to be reported')
+    if (e.missingPackages === 'none' && first.missingPackages.length) problems.push(`missing packages: ${first.missingPackages.join(', ')}`)
+    if (e.missingPackages === 'some' && !first.missingPackages.length) problems.push('expected missing packages to be reported')
 
     const ok = problems.length === 0
     const known = !ok && c.knownFailure

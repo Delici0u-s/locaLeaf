@@ -5,7 +5,8 @@
     "e2e-fixtures": 1500000,
     "e2e-extremes": 1200000,
     "engine": 1800000,
-    "default": 600000
+    "default": 600000,
+    "e2e-history-ot": 600000
   },
   "step": {
     "default": 180000,

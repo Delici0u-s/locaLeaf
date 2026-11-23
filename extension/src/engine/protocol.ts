@@ -78,6 +78,8 @@ export interface CompileResult {
   projectRoot: string
   /** Fonts fontspec asked for that couldn't be provided (the PDF would use the wrong font). */
   missingFonts: string[]
+  /** TeX Live files the document needs that the engine couldn't get (the PDF would be incomplete). */
+  missingPackages: string[]
   message?: string
 }
 

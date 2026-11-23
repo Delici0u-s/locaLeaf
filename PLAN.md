@@ -298,7 +298,8 @@ and later maybe `NativeBackend` (native messaging). The router picks one based o
 4. ✅ **SyncTeX** in both directions (own parser, `synctex view`/`edit` conventions), biber/bibtex/makeindex,
    per-project local/server toggle and status badge. Also done: fetching fonts by family name, and
    compiling on the server when fonts are missing.
-   ⏳ *Not done:* the TeX Live version notice (compare the project's `imageName` with TL 2026).
+   Also: a one-time notice when the project's `imageName` isn't TeX Live 2026, and compiling on the server when
+   TeX Live packages are missing locally (project-file typos excluded).
 5. ◐ **Tests:** unit (`test/unit`), engine (`test/engine`, 12 cases incl. errors, halt, subfolder main,
    bibtex/biber, draft, fonts, 5 public projects), e2e against a local Overleaf CE (`test/e2e`: 14 checks incl.
    collaborator edits in non-open files, SyncTeX, log pane, clear cache, no server compiles), and the public
@@ -309,8 +310,10 @@ and later maybe `NativeBackend` (native messaging). The router picks one based o
    found and fixed: transient `joinDoc` failures on a busy server (now retried with backoff) and the history blob
    route's rate limit (files now come from the unlimited `/Project/:id/file/:id` route; a 429 is retried within
    `maxRetryAfterMs`). Every test has a hard deadline and saves diagnostics (`test/lib/harness.mjs`).
-   ⏳ *Not tested yet:* out-of-memory, `minted`/shell-escape (expected to fall back), history-ot docs (CE didn't
-   produce one), and your real server.
+   history-ot (`test/e2e/history-ot.mjs`): projects are migrated with Overleaf's own migration
+   (`test/e2e/migrate-history-ot.sh`); the test found and fixed a stale-text bug (compile barrier now waits for
+   history-ot re-fetches).
+   ⏳ *Not tested yet:* out-of-memory, `minted`/shell-escape (expected to fall back), and your real server.
 6. Optional: `NativeBackend` via native messaging. Not needed so far.
 
 ### Open issues

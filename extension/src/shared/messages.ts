@@ -24,6 +24,8 @@ export type PageRequest =
 export interface HelloReply {
   settings: Settings
   mode: ProjectMode
+  /** TeX Live release of the local engine. */
+  texliveYear: number
 }
 
 export type CompileReply =

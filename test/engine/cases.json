@@ -81,6 +81,26 @@
       }
     },
     {
+      "name": "missing-package",
+      "project": "missing-package",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "missingPackages": "some"
+      }
+    },
+    {
+      "name": "missing-input-typo",
+      "project": "missing-input",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "failure",
+        "missingPackages": "none"
+      },
+      "$note": "A missing \\input aborts TeX in batch mode (same on Overleaf's server): no PDF, but not a missing package either."
+    },
+    {
       "name": "fixture:ieee-journal",
       "fixture": "ieee-journal",
       "expect": {

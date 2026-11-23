@@ -33,6 +33,7 @@ let lastCompile: { status: string; passes: string[]; errors: number; main: strin
 // Debug hook (also handy in the browser console): what the last local compile did.
 ;(window as any).__overleafLocalRender = {
   lastCompile: () => lastCompile,
+  docTypes: () => mirror?.docTypes() ?? {},
   mirrorPaths: () => (mirror ? [...mirror.entities.keys()].map(id => mirror!.pathOf(id)).filter(Boolean).sort() : []),
 }
 
@@ -54,7 +55,7 @@ async function start() {
   if (mode !== 'local') return
   await whenIo()
   mirror = new ProjectMirror(projectId, getMeta('ol-wsUrl') ?? '', settings, log)
-  mirror.ready.catch(e => log('mirror failed to start', e))
+  mirror.ready.then(() => noticeTexLiveYear(hello.texliveYear), e => log('mirror failed to start', e))
 }
 
 window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -111,6 +112,10 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
       serverOnly = `fonts not available locally: ${result.missingFonts.join(', ')}`
       throw new Fallback(serverOnly)
     }
+    if (result.missingPackages.length && settings?.serverOnMissingPackages) {
+      serverOnly = `packages not available locally: ${result.missingPackages.join(', ')}`
+      throw new Fallback(serverOnly)
+    }
     const build = store.add(projectId, result)
     lastCompile = { status: result.status, passes: result.passes, errors: result.errors, main, ms: result.ms, log: new TextDecoder().decode(result.files['output.log'] ?? new Uint8Array()) }
     log(`compiled ${main} locally: ${result.status}, ${result.passes.length} passes, engine ${Math.round(result.ms)} ms, total ${Math.round(performance.now() - t0)} ms${result.cached ? ' (unchanged)' : ''}`)
@@ -130,6 +135,16 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
 }
 
 class Fallback extends Error {}
+
+/** Output can differ slightly between TeX Live releases: say so once if the project's server image isn't ours. */
+function noticeTexLiveYear(local: number) {
+  const image = mirror?.project.imageName ?? ''
+  const year = Number(image.match(/(?:19|20)\d\d/)?.[0])
+  if (year && year !== local) {
+    log(`project image ${image} vs local TeX Live ${local}`)
+    showToast(`this project uses TeX Live ${year} on the server; local compiles use TeX Live ${local}, so the output can differ slightly.`, settings?.toastMs)
+  }
+}
 
 async function compileWithEngine(options: CompileOptions): Promise<CompileResult> {
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -168,6 +183,8 @@ async function barrier() {
       await new Promise(r => setTimeout(r, 5))
     }
   }
+  // history-ot docs whose update arrived but whose new text isn't fetched yet
+  await mirror!.settle()
 }
 
 function header(input: RequestInfo | URL, init: RequestInit | undefined, name: string): string | null {

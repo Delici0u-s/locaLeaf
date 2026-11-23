@@ -2,7 +2,7 @@
 // Classic worker (busytex's scripts use importScripts). One instance serves all projects; each project
 // keeps its files in the in-memory FS between compiles, so recompiles only write what changed.
 import type { CompileMessage, CompileResult, EngineSettings, FromWorker, SyncMessage, ToWorker } from './protocol'
-import { applyDraft, bibtexKey, countErrors, dirname, extname, fontKey, hashBytes, joinPath, missingFonts, sameSnapshot } from './latexmk'
+import { applyDraft, bibtexKey, countErrors, dirname, extname, fontKey, hashBytes, joinPath, missingFiles, missingFonts, missingPackages, sameSnapshot } from './latexmk'
 
 // Typed loosely: the project compiles with the DOM lib, not WebWorker.
 declare const self: {
@@ -171,7 +171,7 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   const optionsKey = JSON.stringify([msg.main, msg.compiler, msg.draft, msg.stopOnFirstError])
 
   if (!st.sources.has(msg.main)) {
-    return { status: 'failure', files: {}, passes: [], errors: 0, ms: 0, cached: false, outputDir: '', projectRoot: root, missingFonts: [], message: `main document ${msg.main} not found in project` }
+    return { status: 'failure', files: {}, passes: [], errors: 0, ms: 0, cached: false, outputDir: '', projectRoot: root, missingFonts: [], missingPackages: [], message: `main document ${msg.main} not found in project` }
   }
   if (!st.dirty && st.lastKey === optionsKey && st.lastResult) {
     return { ...st.lastResult, files: { ...cloneFiles(st.lastResult.files) }, cached: true, ms: performance.now() - t0 }
@@ -227,9 +227,11 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
       files[name] = FS.readFile(joinPath(outDir, name))
     }
   }
-  const errors = countErrors(files[`${JOB}.log`] ? dec.decode(files[`${JOB}.log`]) : '')
+  const finalLog = files[`${JOB}.log`] ? dec.decode(files[`${JOB}.log`]) : ''
+  const errors = countErrors(finalLog)
+  const packages = missingPackages(missingFiles(finalLog), st.sources.keys())
   const status = halted ? 'stopped-on-first-error' : files[`${JOB}.pdf`] ? 'success' : 'failure'
-  const result: CompileResult = { status, files, passes, errors, ms: performance.now() - t0, cached: false, outputDir: outDirRel, projectRoot: root, missingFonts: fonts }
+  const result: CompileResult = { status, files, passes, errors, ms: performance.now() - t0, cached: false, outputDir: outDirRel, projectRoot: root, missingFonts: fonts, missingPackages: packages }
   st.dirty = false
   st.lastKey = optionsKey
   st.lastResult = { ...result, files: cloneFiles(files) }

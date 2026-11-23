@@ -3,6 +3,18 @@
   "busytexVersion": "1.4.1",
   "releaseUrl": "https://github.com/TeXlyre/texlyre-busytex/releases/download/assets-v{version}/busytex-assets.tar.gz",
   "vendorDir": "vendor/busytex",
-  "engineFiles": ["busytex.js", "busytex.wasm", "busytex_pipeline.js", "busytex_biber.js", "biber.js", "biber.wasm", "biber.data"],
-  "bundles": ["texlive-recommended"]
+  "engineFiles": [
+    "busytex.js",
+    "busytex.wasm",
+    "busytex_pipeline.js",
+    "busytex_biber.js",
+    "biber.js",
+    "biber.wasm",
+    "biber.data"
+  ],
+  "bundles": [
+    "texlive-recommended"
+  ],
+  "texliveYear": 2026,
+  "$texliveYear": "TeX Live release inside the engine bundle (shown when a project's server image uses another year)."
 }

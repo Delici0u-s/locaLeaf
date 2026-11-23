@@ -75,6 +75,7 @@ The popup lists every setting with its current value. Defaults live in
 | `engineIdleMinutes` | 15 | Close the engine when unused (frees memory) |
 | `fallbackToServer` | true | Compile on the server if a local compile can't run |
 | `serverOnMissingFonts` | true | Compile on the server if fonts can't be provided locally |
+| `serverOnMissingPackages` | true | Compile on the server if TeX Live packages can't be provided locally |
 
 ## Limitations
 
@@ -88,7 +89,10 @@ The popup lists every setting with its current value. Defaults live in
 - **Not supported locally** (compiles on the server instead): the `latex` (DVI) compiler, `-shell-escape`
   packages like `minted`, and `makeglossaries`.
 - The first time each package outside the bundle is used, it is downloaded from `remoteEndpoint`.
-  Some packages are missing there (for example `kaobook`).
+  Some packages are missing there (for example `kaobook`). A project that needs one is compiled **on the
+  server** instead (`serverOnMissingPackages`), with a notice. A missing file of your own (a typo in `\input`)
+  isn't treated that way, because the server would fail on it too.
+- If the project's TeX Live image on the server isn't TeX Live 2026, a notice says the output can differ slightly.
 - You show up twice in the "online users" list, because the extension's connection counts as a second tab.
 
 ## Development
@@ -100,6 +104,7 @@ npm run typecheck
 npm run test:unit                                       # OT, SyncTeX, rerun logic
 npm run test:engine                                     # TeX engine in a real browser
 npm run test:e2e                                        # extension + local Overleaf, in Brave
+npm run test:e2e:history-ot                             # projects using Overleaf's newer history-ot documents
 npm run test:e2e:extremes                               # 1000 files, 30 MB of images, umlauts, renaming
 npm run test:e2e:fixtures                               # bigger public projects end to end
 npm run test:all                                        # everything above, in order

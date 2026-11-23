@@ -46,3 +46,19 @@ test('font keys match the index normalization', () => {
   assert.equal(fontKey('Source Sans 3 Light'), 'sourcesans3light')
   assert.equal(fontKey('TeX_Gyre-Termes'), 'texgyretermes')
 })
+
+import { missingFiles, missingPackages } from '../../extension/src/engine/latexmk'
+
+test('reads missing-file errors from a TeX log', () => {
+  const log = [
+    "! LaTeX Error: File `kaobook.cls' not found.",
+    "! I can't find file `chapterz/intro'.",
+    '! Font \\T1/abc/m/n/10=abcr8t at 10.0pt not loadable: Metric (TFM) file not found.',
+  ].join('\n')
+  assert.deepEqual(missingFiles(log), ['kaobook.cls', 'chapterz/intro', 'abcr8t.tfm'])
+})
+
+test('a missing package is not a mistyped project file', () => {
+  const sources = ['main.tex', 'chapters/intro.tex', 'mystyle.sty']
+  assert.deepEqual(missingPackages(['kaobook.cls', 'chapterz/intro', 'mystyle.sty', 'abcr8t.tfm'], sources), ['kaobook.cls', 'abcr8t.tfm'])
+})

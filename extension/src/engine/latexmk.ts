@@ -49,6 +49,28 @@ export function missingFonts(log: string): string[] {
   return [...out]
 }
 
+/** Files TeX asked for and didn't get ("File `x.sty' not found", "I can't find file `x'"). */
+export function missingFiles(log: string): string[] {
+  const out = new Set<string>()
+  for (const m of log.matchAll(/^! LaTeX Error: File `([^']+)' not found\./gm)) out.add(m[1])
+  for (const m of log.matchAll(/^! I can't find file `([^']+)'/gm)) out.add(m[1])
+  for (const m of log.matchAll(/^! Font \\\S+=(\S+) at [^ ]+ not loadable: Metric \(TFM\) file not found/gm)) out.add(`${m[1]}.tfm`)
+  return [...out]
+}
+
+/** Missing files that look like TeX Live packages rather than project files the user mistyped. */
+export function missingPackages(missing: string[], sources: Iterable<string>): string[] {
+  const projectNames = new Set<string>()
+  for (const p of sources) {
+    projectNames.add(p)
+    projectNames.add(p.replace(/\.tex$/, ''))
+    const base = p.slice(p.lastIndexOf('/') + 1)
+    projectNames.add(base)
+    projectNames.add(base.replace(/\.tex$/, ''))
+  }
+  return missing.filter(f => !projectNames.has(f) && /\.(sty|cls|bst|def|cfg|clo|fd|tfm|ldf|bbx|cbx|lbx|code\.tex)$/.test(f))
+}
+
 /** Normalizes a font name the way config/font-index.json keys are. */
 export function fontKey(name: string): string {
   return name.toLowerCase().replace(/[\s_-]+/g, '')
