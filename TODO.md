@@ -4,6 +4,9 @@
 
 - [ ] **Popup UI redesign.** The current popup is a plain form. Needs a proper switch for local/server
   compiling, a clear status area, and settings grouped and explained instead of a raw key list.
+  - **Progress chip position:** a setting for where the chip goes: a screen corner, dragged into place in the
+    page, or inline in Overleaf's PDF toolbar (in the empty space right of the download button, which sits
+    right of Recompile). Inline needs a robust way to find that toolbar.
 - [x] **Progress / first-load indicator in the page.** A status chip (after `statusDelayMs`) shows what LocaLeaf
   is doing: loading the project (docs/files done), starting the engine, TeX pass n, downloads with MB and %,
   plus the elapsed seconds. The same lines go to the console.
