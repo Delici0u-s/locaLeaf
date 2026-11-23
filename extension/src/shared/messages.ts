@@ -69,4 +69,5 @@ export type BackgroundRequest =
   | { type: 'getEngineConfig' }
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
   | { type: 'engineStatus' }
+  | { type: 'restartEngine' }
   | { type: 'live'; state: LiveState; text: string }

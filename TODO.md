@@ -36,8 +36,15 @@
   The test now fills the box. (Tree changes are applied from Overleaf's requests and in-flight ones are awaited,
   which stays as a safeguard.)
 
+- [x] Hang until the time limit when a new/reloaded tab needed the engine after Chrome had stopped the idle
+  service worker (it waited for a "ready" message sent long ago). Fixed; e2e test stops the service worker.
+  Also: timeouts on every real-time call, reconnect before the barrier, progress for each compile phase.
+
 ## Nice to have
 
+- [x] Per-project build state across restarts (`engine.persistBuildMB`): first compile after reopening is
+  incremental (book: 30 s / 5 passes → 13 s / 2 passes), instant when nothing changed.
+- [x] Restart-engine button in the popup.
 - [x] Packaged release: `npm run package` → `release/localeaf-<version>.zip` (no personal sites in it).
 - [x] Faster first compile with non-bundled fonts: converted LuaTeX font caches and package-server files are
   kept in IndexedDB across engine restarts (`engine.persistCacheMB`). LuaLaTeX with Fira Sans: first compile of a

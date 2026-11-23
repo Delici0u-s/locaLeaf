@@ -62,8 +62,9 @@ and reload the Overleaf tab.
    back to the server. In that case a notice in the page says why.
 
 Per project you can switch between compiling *locally* and *on the server* in the popup.
-The first compile after opening a project takes a few seconds longer, because the extension
-loads the whole project and starts the engine. After that, recompiles only process what changed.
+The first compile after opening a project takes a few seconds longer, because the extension loads the whole
+project and starts the engine. LocaLeaf keeps each project's last build, so even that first compile only redoes
+what changed since last time, and a project you didn't change shows its PDF right away.
 
 ## What goes over the network
 
@@ -117,6 +118,7 @@ The popup lists every setting with its current value. Defaults live in
 | `engine.biberArgs` | `--output-safechars` | Works around an encoding bug in the WASM biber |
 | `engine.maxProjects` | 4 | Projects kept in engine memory |
 | `engine.persistCacheMB` | 300 | Converted fonts and downloaded files kept across engine restarts (faster first compile) |
+| `engine.persistBuildMB` | 40 | Per project: last build kept across restarts; first compile is incremental, or instant if nothing changed |
 | `engineIdleMinutes` | 15 | Close the engine when unused (frees memory) |
 | `fallbackToServer` | true | Compile on the server if a local compile can't run |
 | `serverOnMissingFonts` | true | Compile on the server if fonts can't be provided locally |

@@ -100,7 +100,7 @@ try {
     // saving happens in the background after each compile: wait until no new "persist:" lines appear
     let seen = 0
     await h.waitFor('the cache save to settle', async () => {
-      const n = (await page.evaluate(() => window.engine.prints())).filter(l => l.startsWith('persist:')).length
+      const n = (await page.evaluate(() => window.engine.prints())).filter(l => l.startsWith('persist:') || l.startsWith('build saved:')).length
       const settled = n === 0 && seen > 0
       seen += n
       return settled
@@ -118,6 +118,31 @@ try {
     if (!ok) failed++
     results.push({ case: 'restart keeps fonts', result: ok ? 'ok' : 'FAIL', first: `${(again.ms / 1000).toFixed(2)}s/${again.passes.length}p`, unchanged: '', edit: '', status: again.status, errors: again.errors })
     if (!ok) console.log(`FAIL restart keeps fonts: ${restored || 'nothing restored'}, ${(again.ms / 1000).toFixed(1)} s vs first ${firstS} s`)
+  }
+
+  // ... and each project's build state: the book's first compile after the restart is incremental.
+  const bookCase = results.find(r => r.case === 'fixture:lshort')
+  if (bookCase && fontCase) {
+    h.step('engine restart keeps the build state of a project')
+    const fx = fixtures.lshort
+    const dir = join(ROOT, 'bench/fixtures', fx.name)
+    const files = listFiles(dir).map(p => ({ path: p, url: `/fixtures/${fx.name}/${p.split('/').map(encodeURIComponent).join('/')}` }))
+    // exactly the sources of the saved build (the test's last step edited one file): PDF without a TeX run
+    const editPath = fx.edit ?? fx.main
+    const edited = appendEdit(readFileSync(join(dir, editPath), 'utf8'), 1)
+    await page.evaluate(([f, ov]) => window.engine.sync('fixture:lshort', f, { reset: true, overrides: ov }), [files, { [editPath]: edited }])
+    const instant = await page.evaluate(([o]) => window.engine.compile('fixture:lshort', o), [{ main: fx.main, compiler: fx.compiler, draft: false, stopOnFirstError: false }])
+    const instantOk = instant.status === 'success' && instant.cached && instant.pdfBytes > 0 && instant.ms < 1000
+    if (!instantOk) failed++
+    results.push({ case: 'reopen unchanged: instant', result: instantOk ? 'ok' : 'FAIL', first: `${(instant.ms / 1000).toFixed(2)}s/${instant.cached ? 'cached' : `${instant.passes.length}p`}`, unchanged: '', edit: '', status: instant.status, errors: instant.errors })
+    // one line different from the saved build: incremental
+    await page.evaluate(([f]) => window.engine.sync('fixture:lshort', f, { reset: true }), [files])
+    const r = await page.evaluate(([o]) => window.engine.compile('fixture:lshort', o), [{ main: fx.main, compiler: fx.compiler, draft: false, stopOnFirstError: false }])
+    const firstS = parseFloat(bookCase.first)
+    const ok = r.status === 'success' && r.passes.filter(p => p.includes('latex')).length <= 2 && r.ms / 1000 < firstS / 2
+    if (!ok) failed++
+    results.push({ case: 'restart keeps build', result: ok ? 'ok' : 'FAIL', first: `${(r.ms / 1000).toFixed(2)}s/${r.passes.length}p`, unchanged: '', edit: '', status: r.status, errors: r.errors })
+    if (!ok) console.log(`FAIL restart keeps build: ${r.passes.join(' → ')}, ${(r.ms / 1000).toFixed(1)} s vs first ${firstS} s`)
   }
 } catch (e) {
   failed++

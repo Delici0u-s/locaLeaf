@@ -151,8 +151,17 @@ chrome.runtime.onConnect.addListener(port => {
 })
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'restartEngine') {
+    // from the popup: fresh worker (pages resync on their next compile, as after a stop)
+    stop()
+    sendResponse({ ok: true })
+    return false
+  }
   if (msg?.type === 'engineStatus') {
-    ready.then(() => sendResponse({ state: 'ready', epoch }), e => sendResponse({ state: 'error', error: String(e) }))
+    // answers at once (also while the engine is still starting), so callers never wait on it
+    let state = 'starting'
+    ready.then(() => { state = 'ready' }, () => { state = 'error' })
+    queueMicrotask(() => sendResponse({ state, epoch }))
     return true
   }
 })

@@ -30,6 +30,7 @@ export interface Settings {
   statusY: number
   liveUpdateMs: number
   previewMs: number
+  engineStartTimeoutMs: number
 }
 
 export type StatusPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'toolbar' | 'custom'

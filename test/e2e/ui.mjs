@@ -64,6 +64,18 @@ try {
   await check('settings are grouped, unknown ones under Advanced', groups.length >= 5 && groups.at(-1) === 'Advanced', groups.join(' | '))
   await popup.locator('#groups details').first().evaluate(d => { d.open = true })
   await popup.screenshot({ path: join(ART, 'ui-popup-settings.png'), fullPage: true })
+  h.step('restarting the engine from the popup')
+  await popup.locator('#restart').click()
+  const pill = await h.waitFor('the engine to be ready again', async () => { const t = await popup.locator('#engine').textContent(); return /ready/.test(t ?? '') ? t : null })
+  await check('popup restart button restarts the engine', /ready/.test(pill), pill)
+  const nR = logs.length
+  await page.locator('.cm-content .cm-line').first().click()
+  await page.keyboard.press('End')
+  await page.keyboard.type('%')
+  await page.waitForTimeout(1000)
+  await page.locator('button:has-text("Recompile")').first().click()
+  const afterRestart = await h.waitFor('a compile after the restart', () => logs.slice(nR).find(l => /compiled .* locally|local compile failed/.test(l)))
+  await check('the next compile after a restart is local', /locally: success/.test(afterRestart), afterRestart)
   await popup.emulateMedia({ colorScheme: 'dark' })
   await popup.screenshot({ path: join(ART, 'ui-popup-dark.png'), fullPage: true })
 

@@ -34,7 +34,10 @@
     "downloadTimeoutSeconds": 120,
     "$maxCtanPackageMB": "CTAN packages larger than this aren't downloaded (font collections like Noto are hundreds of MB); projects needing them compile on the server.",
     "persistCacheMB": 300,
-    "$persistCacheMB": "Converted fonts and downloaded TeX Live files kept across engine restarts (IndexedDB), up to this size. 0 = off."
+    "$persistCacheMB": "Converted fonts and downloaded TeX Live files kept across engine restarts (IndexedDB), up to this size. 0 = off.",
+    "persistBuildMB": 40,
+    "persistBuildProjects": 20,
+    "$persistBuildMB": "Per project: the last build's generated files (and its PDF if it fits) kept across engine restarts, so the first compile is incremental (or instant when nothing changed). 0 = off."
   },
   "keepBuilds": 3,
   "barrierTimeoutMs": 3000,
@@ -76,5 +79,7 @@
   "previewMs": 2500,
   "$previewMs": "How long the progress indicator is shown after changing its position.",
   "statusFallbackPosition": "bottom-left",
-  "$statusFallbackPosition": "Corner used when the toolbar spot can't be found (e.g. Overleaf changed its layout)."
+  "$statusFallbackPosition": "Corner used when the toolbar spot can't be found (e.g. Overleaf changed its layout).",
+  "engineStartTimeoutMs": 120000,
+  "$engineStartTimeoutMs": "Give up (and compile on the server) if the TeX engine doesn't start within this. The very first start loads the ~200 MB TeX Live bundle."
 }

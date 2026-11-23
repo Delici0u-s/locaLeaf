@@ -172,8 +172,16 @@ export class ProjectMirror {
     }
   }
 
+  /** leaveDoc that never hangs: resolves on the server's answer or after joinTimeoutMs. */
+  private leaveDoc(id: string): Promise<void> {
+    return new Promise(resolve => {
+      const timer = window.setTimeout(resolve, this.settings.joinTimeoutMs)
+      this.socket.emit('leaveDoc', id, () => { clearTimeout(timer); resolve() })
+    })
+  }
+
   private rejoin(id: string) {
-    this.socket.emit('leaveDoc', id, () => this.joinDocWithRetry(id).catch(e => this.fail(e)))
+    this.leaveDoc(id).then(() => this.joinDocWithRetry(id)).catch(e => this.fail(e))
   }
 
   private onUpdate(u: { doc: string; v: number; op?: any[] }) {
@@ -275,7 +283,7 @@ export class ProjectMirror {
 
   /** Re-fetches one doc (used when the editor is ahead and the op never arrived). */
   refreshDoc(id: string): Promise<void> {
-    return new Promise(resolve => this.socket.emit('leaveDoc', id, () => this.joinDocWithRetry(id).then(resolve, e => { this.fail(e); resolve() })))
+    return this.leaveDoc(id).then(() => this.joinDocWithRetry(id)).catch(e => this.fail(e))
   }
 
   /** What the engine needs to match the project. Call commitSync() once the engine has it. */

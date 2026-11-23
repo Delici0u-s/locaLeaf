@@ -23,6 +23,10 @@ export interface EngineSettings {
   downloadTimeoutSeconds: number
   /** Keep converted fonts and package-server files across engine restarts, up to this size (0: off). */
   persistCacheMB: number
+  /** Keep each project's build state (and last output) across engine restarts, up to this size (0: off). */
+  persistBuildMB: number
+  /** How many projects' build states are kept. */
+  persistBuildProjects: number
 }
 
 export interface InitMessage {

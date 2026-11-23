@@ -88,6 +88,24 @@ try {
   await check('edit + recompile is local', /locally: success/.test(second), second)
   await check('edit appears in the PDF', await waitForPdfText(page, 'EDITEDINMAIN'))
 
+  // 2b. Chrome stops the extension's service worker when idle while the engine keeps running. A new tab must
+  //     still get the engine (this used to hang until the time limit).
+  {
+    const cdp = await context.newCDPSession(page)
+    const sw = context.serviceWorkers()[0]
+    const { targetInfos } = await cdp.send('Target.getTargets')
+    const target = targetInfos.find(t => t.type === 'service_worker' && t.url === sw?.url())
+    if (target) await cdp.send('Target.closeTarget', { targetId: target.targetId })
+    await cdp.detach()
+    const tab3 = await context.newPage()
+    const con3 = watchConsole(tab3, 'after-sw-stop')
+    const t3 = Date.now()
+    await tab3.goto(`${OVERLEAF_URL}/project/${projectId}`)
+    const r3 = await con3.waitFor(/compiled .* locally|local compile failed/)
+    await check('a new tab compiles locally after the service worker was stopped', /locally: success/.test(r3) && !!target, `${Date.now() - t3} ms · ${r3}`)
+    await tab3.close()
+  }
+
   // 3. A change to another file, made in a second tab (like a collaborator), reaches the local build.
   const tab2 = await context.newPage()
   const con2 = watchConsole(tab2, 'tab2')

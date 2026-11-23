@@ -39,7 +39,9 @@
         "engine.maxPasses",
         "engine.maxProjects",
         "engineIdleMinutes",
-        "engine.biberArgs"
+        "engine.biberArgs",
+        "engine.persistBuildMB",
+        "engine.persistBuildProjects"
       ]
     }
   ],
@@ -169,6 +171,14 @@
           "Top right"
         ]
       ]
+    },
+    "engine.persistBuildMB": {
+      "label": "Keep each project's last build up to",
+      "unit": "MB",
+      "help": "Faster first compile after opening a project; instant if nothing changed. 0: off."
+    },
+    "engine.persistBuildProjects": {
+      "label": "…for this many projects"
     }
   }
 }

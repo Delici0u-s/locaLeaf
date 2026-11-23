@@ -55,11 +55,16 @@ self.onmessage = async ({ data }: MessageEvent<ToWorker>) => {
       ctanMirror = data.ctanMirror
       await init(data.basePath, data.bundles, data.remoteEndpoint, data.settings)
     }
-    else if (data.type === 'sync') sync(data)
+    else if (data.type === 'sync') await sync(data)
     else if (data.type === 'compile') {
       const result = await compile(data)
       post({ type: 'compiled', id: data.id, result }, Object.values(result.files).map(f => f.buffer as ArrayBuffer))
       persistCaches().catch(e => post({ type: 'print', text: `saving caches failed: ${e}` })) // after replying
+      if (pendingBuildSave) {
+        const id = pendingBuildSave
+        pendingBuildSave = null
+        saveBuild(id).catch(e => post({ type: 'print', text: `saving the build failed: ${e}` }))
+      }
     } else if (data.type === 'debugChangedFiles' && __TEST_HOOKS__) {
       const out: string[] = []
       const walk = (dir: string) => {
@@ -127,7 +132,7 @@ function state(projectId: string): ProjectState {
 
 const projectDir = (projectId: string) => joinPath(PROJECTS_ROOT, projectId)
 
-function sync(msg: SyncMessage) {
+async function sync(msg: SyncMessage) {
   const FS = Module.FS
   const root = projectDir(msg.projectId)
   if (!msg.reset && !projects.has(msg.projectId)) {
@@ -135,7 +140,9 @@ function sync(msg: SyncMessage) {
     post({ type: 'synced', projectId: msg.projectId, needReset: true })
     return
   }
+  const fresh = !projects.has(msg.projectId)
   const st = state(msg.projectId)
+  const saved = fresh ? await restoreBuild(msg.projectId, st) : null
   st.lastUsed = performance.now()
   mkdirP(root)
   // A full snapshot replaces the source list. Unchanged files aren't rewritten and generated files
@@ -158,6 +165,12 @@ function sync(msg: SyncMessage) {
     st.sources.set(path, hash)
     st.rawSources.set(path, bytes)
     st.dirty = true
+  }
+  // Same sources as when the saved build was made: its result is still valid (PDF right away, no TeX run).
+  if (saved?.result && sameSources(st.sources, saved.sources)) {
+    st.lastResult = saved.result
+    st.lastKey = saved.lastKey
+    st.dirty = false
   }
   evictIfNeeded(msg.projectId)
   post({ type: 'synced', projectId: msg.projectId, needReset: false })
@@ -285,6 +298,7 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   st.dirty = false
   st.lastKey = optionsKey
   st.lastResult = { ...result, files: cloneFiles(files) }
+  if (status === 'success') pendingBuildSave = msg.projectId // saved after the reply (see onmessage)
   return result
 }
 
@@ -371,6 +385,78 @@ async function provideFromCtan(files: string[]): Promise<number> {
   const pkgs = new Set(files.map(f => index[f] ?? index[`${f}.tex`]).filter((p): p is string => !!p && !ctanPackages.has(p)))
   const results = await Promise.all([...pkgs].map(p => ctanPackage(p)))
   return results.filter(r => r.length > 0).length
+}
+
+// ---- per-project build state that survives engine restarts ----
+// The generated files (.aux, .toc, .bbl, fetched fonts …) and tool state of a project's last successful compile,
+// so the first compile of a new session runs like a recompile (1-2 passes instead of 3-5). If it fits
+// settings.persistBuildMB the output is kept too: reopening an unchanged project gives its PDF without a TeX run.
+
+interface SavedBuild {
+  sources: Record<string, string>
+  generated: Record<string, Uint8Array>
+  toolKeys: ProjectState['toolKeys']
+  lastKey: string | null
+  result: CompileResult | null
+  savedAt: number
+}
+const BUILD_INDEX = 'build:index'
+let pendingBuildSave: string | null = null
+
+function sameSources(a: Map<string, string>, b: Record<string, string>): boolean {
+  const keys = Object.keys(b)
+  return keys.length === a.size && keys.every(k => a.get(k) === b[k])
+}
+
+async function saveBuild(projectId: string) {
+  const st = projects.get(projectId)
+  if (!st?.lastResult || !settings.persistBuildMB) return
+  const root = projectDir(projectId)
+  const budget = settings.persistBuildMB * 1024 * 1024
+  const generated: Record<string, Uint8Array> = {}
+  let size = 0
+  for (const path of listFiles(root)) {
+    if (st.sources.has(path) || path.endsWith('.pdf') || path.endsWith('.synctex.gz') || path.endsWith('.xdv')) continue
+    const bytes: Uint8Array = Module.FS.readFile(joinPath(root, path))
+    size += bytes.length
+    generated[path] = bytes
+  }
+  if (size > budget) return // too big to be worth keeping
+  const resultSize = Object.values(st.lastResult.files).reduce((n, f) => n + f.length, 0)
+  const saved: SavedBuild = {
+    sources: Object.fromEntries(st.sources),
+    generated,
+    toolKeys: st.toolKeys,
+    lastKey: st.lastKey,
+    result: size + resultSize <= budget ? st.lastResult : null,
+    savedAt: Date.now(),
+  }
+  await idbPut(`build:${projectId}`, saved)
+  // keep only the most recently used projects
+  const index: Record<string, number> = ((await idbGet(BUILD_INDEX)) as Record<string, number> | null) ?? {}
+  index[projectId] = saved.savedAt
+  const ordered = Object.entries(index).sort((a, b) => b[1] - a[1])
+  for (const [old] of ordered.slice(settings.persistBuildProjects)) {
+    await idbDelete(`build:${old}`)
+    delete index[old]
+  }
+  await idbPut(BUILD_INDEX, index)
+  post({ type: 'print', text: `build saved: ${projectId} (${(size / 1048576).toFixed(1)} MB generated${saved.result ? ' + output' : ''})` })
+}
+
+async function restoreBuild(projectId: string, st: ProjectState): Promise<SavedBuild | null> {
+  if (!settings.persistBuildMB) return null
+  const saved = (await idbGet(`build:${projectId}`)) as SavedBuild | null
+  if (!saved) return null
+  const root = projectDir(projectId)
+  for (const [path, bytes] of Object.entries(saved.generated)) {
+    const full = joinPath(root, path)
+    mkdirP(dirname(full))
+    Module.FS.writeFile(full, bytes)
+  }
+  st.toolKeys = saved.toolKeys ?? {}
+  post({ type: 'progress', text: `restored the last build of this project (${Object.keys(saved.generated).length} files)` })
+  return saved
 }
 
 // ---- caches that survive engine restarts ----
@@ -470,6 +556,26 @@ async function cacheGet(key: string): Promise<ArrayBuffer | null> {
     const req = db.transaction('files').objectStore('files').get(key)
     req.onsuccess = () => resolve(req.result ?? null)
     req.onerror = () => resolve(null)
+  })
+}
+
+/** Any structured-cloneable value (objects with Uint8Arrays …). */
+async function idbGet(key: string): Promise<unknown> {
+  return cacheGet(key)
+}
+
+async function idbPut(key: string, value: unknown): Promise<void> {
+  return cachePut(key, value as ArrayBuffer)
+}
+
+async function idbDelete(key: string): Promise<void> {
+  const db = await openCacheDb()
+  if (!db) return
+  return new Promise(resolve => {
+    const tx = db.transaction('files', 'readwrite')
+    tx.objectStore('files').delete(key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
   })
 }
 

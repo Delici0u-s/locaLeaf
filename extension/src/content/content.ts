@@ -13,6 +13,7 @@ const waiting = new Map<number, { resolve: (v: any) => void; reject: (e: Error) 
 
 async function enginePort(): Promise<chrome.runtime.Port> {
   if (port) return port
+  window.postMessage({ channel: EXT_CHANNEL, progress: 'starting the TeX engine' }, window.location.origin)
   const r = await chrome.runtime.sendMessage({ type: 'ensureEngine' })
   if (!r?.ok) throw new Error(`engine unavailable: ${r?.error ?? 'no response'}`)
   const p = chrome.runtime.connect({ name: ENGINE_PORT })

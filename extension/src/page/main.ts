@@ -198,12 +198,15 @@ async function handleCompile(input: RequestInfo | URL, init?: RequestInit): Prom
 
 async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t0: number, body: any): Promise<Response> {
   {
-    // A mirror that failed to start (server hiccup) gets one fresh attempt per compile.
+    // A mirror that failed to start or lost its connection (server hiccup, idle disconnect) is reconnected
+    // before anything waits on it.
     await mirror!.ready.catch(() => restartMirror())
+    if (mirror!.broken) await restartMirror()
     const compiler = mirror!.project.compiler as Compiler
     if (!SUPPORTED.includes(compiler)) throw new Fallback(`compiler "${compiler}" isn't supported locally`)
     const main = body.rootResourcePath || (body.rootDoc_id && mirror!.pathOf(body.rootDoc_id))
     if (!main) throw new Fallback('no main document')
+    phase('waiting for your latest edits to reach LocaLeaf')
     await barrier()
     const options: CompileOptions = { main, compiler, draft: !!body.draft, stopOnFirstError: !!body.stopOnFirstError }
     if (state.abandoned) throw new Error('abandoned after the time limit')
@@ -232,6 +235,13 @@ async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t
 
 class Fallback extends Error {}
 
+/** A step of the local compile: shown in the chip and the popup, and logged. */
+function phase(text: string) {
+  updateStatus(text)
+  live('compiling', text)
+  log(text)
+}
+
 /** The original compile request to the server, with the popup's live status following it. */
 async function serverCompile(input: RequestInfo | URL, init: RequestInit | undefined, why: string): Promise<Response> {
   const t = performance.now()
@@ -257,6 +267,7 @@ async function compileWithEngine(options: CompileOptions): Promise<CompileResult
   for (let attempt = 0; attempt < 2; attempt++) {
     if (mirror!.broken) await restartMirror()
     const { sync, commit } = mirror!.takeSync(knownEpoch === null)
+    phase(sync.writes.length ? `sending ${sync.writes.length} file${sync.writes.length > 1 ? 's' : ''} to the TeX engine` : 'handing the compile to the TeX engine')
     let reply: CompileReply
     try {
       reply = await ext<CompileReply>({ type: 'compile', projectId, clientId, sync, options, expectEpoch: knownEpoch })

@@ -15,7 +15,13 @@ async function hasOffscreen(): Promise<boolean> {
 }
 
 async function ensureEngine(): Promise<void> {
-  if (offscreenReady && (await hasOffscreen())) return offscreenReady
+  if (await hasOffscreen()) {
+    // Chrome stops this service worker when idle while the engine document keeps running; a restarted worker
+    // must not wait for a "ready" message that was sent long ago. Ask the engine directly instead.
+    const alive = await chrome.runtime.sendMessage({ type: 'engineStatus' }).catch(() => undefined)
+    if (alive?.state) return
+    if (offscreenReady) return withTimeout(offscreenReady)
+  }
   offscreenReady = new Promise(r => (resolveOffscreenReady = r))
   if (!(await hasOffscreen())) {
     await chrome.offscreen.createDocument({
@@ -24,7 +30,18 @@ async function ensureEngine(): Promise<void> {
       justification: 'Runs the TeX engine (WebAssembly) that compiles Overleaf projects locally.',
     })
   }
-  return offscreenReady
+  return withTimeout(offscreenReady)
+}
+
+async function withTimeout(p: Promise<void>): Promise<void> {
+  const ms = mergeSettings(await getStored('settings')).engineStartTimeoutMs
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`the engine didn't start within ${ms / 1000} s`)), ms) })
+  try {
+    return await Promise.race([p, late])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function engineConfigForOffscreen() {

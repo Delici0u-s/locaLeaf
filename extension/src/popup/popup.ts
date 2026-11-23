@@ -60,8 +60,21 @@ async function renderEngine() {
   const pill = $('engine')
   const r = await engineStatus()
   pill.className = `pill ${r?.state === 'ready' ? 'ready' : r?.state === 'error' ? 'error' : ''}`
-  pill.textContent = r?.state === 'ready' ? 'engine ready' : r?.state === 'error' ? 'engine error' : 'engine idle'
-  pill.title = r?.state === 'error' ? r.error ?? '' : r?.state === 'ready' ? 'The TeX engine is running.' : 'Starts when you open an enabled Overleaf project.'
+  pill.textContent = r?.state === 'ready' ? 'engine ready' : r?.state === 'starting' ? 'engine starting' : r?.state === 'error' ? 'engine error' : 'engine idle'
+  pill.title = r?.state === 'error' ? r.error ?? '' : r?.state === 'ready' ? 'The TeX engine is running.' : r?.state === 'starting' ? 'The TeX engine is starting.' : 'Starts when you open an enabled Overleaf project.'
+  const restart = $<HTMLButtonElement>('restart')
+  restart.hidden = !r?.state // only when there's an engine to restart
+  restart.onclick = async () => {
+    restart.disabled = true
+    await chrome.runtime.sendMessage({ type: 'restartEngine' }).catch(() => undefined)
+    restart.disabled = false
+    renderEngine()
+  }
+  // while it starts, keep checking until it's ready (or failed)
+  if (r?.state === 'starting' || (r && !r.state)) {
+    const every = mergeSettings(await getStored('settings')).liveUpdateMs
+    setTimeout(renderEngine, every)
+  }
 }
 
 async function renderSite(origin: string | null, enabled: boolean, builtIn: boolean, origins: string[], tabId?: number) {
