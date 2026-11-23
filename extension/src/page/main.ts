@@ -43,6 +43,7 @@ let lastCompile: { status: string; passes: string[]; errors: number; main: strin
 ;(window as any).__localeaf = {
   lastCompile: () => lastCompile,
   docTypes: () => mirror?.docTypes() ?? {},
+  ...(__TEST_HOOKS__ ? { debugAbortEngine: () => ext({ type: 'debugAbort' }) } : {}),
   mirrorPaths: () => (mirror ? [...mirror.entities.keys()].map(id => mirror!.pathOf(id)).filter(Boolean).sort() : []),
 }
 
@@ -166,6 +167,10 @@ async function compileLocally(state: { stopped: boolean; abandoned: boolean }, t
       serverOnly = `fonts not available locally: ${result.missingFonts.join(', ')}`
       throw new Fallback(serverOnly)
     }
+    if (result.needsShellEscape && settings?.serverOnShellEscape) {
+      serverOnly = 'the document runs external programs (shell escape, e.g. minted), which local compiles can\'t'
+      throw new Fallback(serverOnly)
+    }
     if (result.missingPackages.length && settings?.serverOnMissingPackages) {
       serverOnly = `packages not available locally: ${result.missingPackages.join(', ')}`
       throw new Fallback(serverOnly)
@@ -194,7 +199,18 @@ async function compileWithEngine(options: CompileOptions): Promise<CompileResult
   for (let attempt = 0; attempt < 2; attempt++) {
     if (mirror!.broken) await restartMirror()
     const { sync, commit } = mirror!.takeSync(knownEpoch === null)
-    const reply = await ext<CompileReply>({ type: 'compile', projectId, clientId, sync, options, expectEpoch: knownEpoch })
+    let reply: CompileReply
+    try {
+      reply = await ext<CompileReply>({ type: 'compile', projectId, clientId, sync, options, expectEpoch: knownEpoch })
+    } catch (e: any) {
+      // The engine crashed (e.g. out of memory) and was restarted: try once more on the fresh engine.
+      if (attempt === 0 && /engine crashed and was restarted/.test(String(e?.message))) {
+        log(String(e.message))
+        knownEpoch = null
+        continue
+      }
+      throw e
+    }
     if (reply.kind === 'epochMismatch') {
       knownEpoch = null
       continue
@@ -234,8 +250,19 @@ function treeChange(url: URL, method: string): TreeChange | null {
   return null
 }
 
+/** File tree requests still in flight: Overleaf updates its tree before the server answers, so a compile can
+ *  start before the change reached us. The barrier waits for these. */
+const treeRequests = new Set<Promise<unknown>>()
+
 /** Passes the request on and, once it succeeded, applies the change to the mirror right away. */
-async function trackTreeChange(change: TreeChange, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+function trackTreeChange(change: TreeChange, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const p = applyTreeChange(change, input, init)
+  const settled = p.catch(() => undefined).finally(() => treeRequests.delete(settled))
+  treeRequests.add(settled)
+  return p
+}
+
+async function applyTreeChange(change: TreeChange, input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const res = await originalFetch(input, init)
   if (!res.ok || !mirror) return res
   try {
@@ -249,6 +276,7 @@ async function trackTreeChange(change: TreeChange, input: RequestInfo | URL, ini
       else if (change.kind === 'newFolder' && data?._id) mirror.addFolder({ ...data, docs: [], fileRefs: [], folders: [] }, body.parent_folder_id)
       else if (change.kind === 'upload' && data?.entity_id) mirror.expect(data.entity_id)
     }
+    log(`file tree: ${change.kind} applied`)
   } catch (e) {
     log('could not apply a file tree change to the mirror', e)
   }
@@ -258,6 +286,7 @@ async function trackTreeChange(change: TreeChange, input: RequestInfo | URL, ini
 /** Waits until the mirror has every doc version the editor knows the server has. */
 async function barrier() {
   const deadline = performance.now() + (settings?.barrierTimeoutMs ?? 0)
+  if (treeRequests.size) await Promise.race([Promise.all([...treeRequests]), new Promise(r => setTimeout(r, Math.max(0, deadline - performance.now())))])
   await mirror!.waitForTree(deadline)
   for (const [doc, v] of editorVersions) {
     while (mirror!.hasDoc(doc) && (mirror!.docVersion(doc) ?? v) < v) {

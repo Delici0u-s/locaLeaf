@@ -17,7 +17,7 @@ const defaults = readJson('config/settings.defaults.json')
 const fixtures = Object.fromEntries(readJson('bench/fixtures.json').fixtures.map(f => [f.name, f]))
 const cases = readJson('test/engine/cases.json').cases.filter(c => !filters.length || filters.some(f => c.name.includes(f)))
 
-await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', outfile: join(BUILD, 'engine-worker.js'), target: 'chrome120', logLevel: 'warning' })
+await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', define: { __TEST_HOOKS__: 'true' }, outfile: join(BUILD, 'engine-worker.js'), target: 'chrome120', logLevel: 'warning' })
 
 const server = await serve({ '/ctan/': { proxy: defaults.ctanMirror, cacheDir: join(ROOT, 'test/.cache/ctan') }, '/config/': join(ROOT, 'config'), '/build/': BUILD, '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/fixtures/': join(ROOT, 'bench/fixtures'), '/projects/': join(HERE, 'projects'), '/page/': HERE })
 const { context, close } = await launch()
@@ -71,6 +71,8 @@ try {
     if (first.status === 'success' && !first.synctexBytes) problems.push('no synctex')
     if (e.missingFonts === 'none' && first.missingFonts.length) problems.push(`missing fonts: ${first.missingFonts.join(', ')}`)
     if (e.missingFonts === 'some' && !first.missingFonts.length) problems.push('expected missing fonts to be reported')
+    if (e.needsShellEscape !== undefined && first.needsShellEscape !== e.needsShellEscape) problems.push(`needsShellEscape ${first.needsShellEscape}`)
+    if (e.needsShellEscape === undefined && first.needsShellEscape) problems.push('unexpectedly reported as needing shell escape')
     if (e.missingPackages === 'none' && first.missingPackages.length) problems.push(`missing packages: ${first.missingPackages.join(', ')}`)
     if (e.missingPackages === 'some' && !first.missingPackages.length) problems.push('expected missing packages to be reported')
 

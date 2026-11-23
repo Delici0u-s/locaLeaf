@@ -144,7 +144,17 @@ try {
   const stats = await sw.evaluate(id => chrome.storage.local.get('stats').then(r => r.stats?.projects?.[id]), projectId)
   await check('compile statistics count the local compiles', (stats?.local ?? 0) >= 4 && (stats?.server ?? 0) === 0, JSON.stringify(stats))
 
-  // 9. Nothing was compiled on the server.
+  // 9. An engine crash (simulated abort, like out-of-memory) restarts the engine; the compile still runs locally.
+  await page.evaluate(() => window.__localeaf.debugAbortEngine())
+  const n9 = con.lines.length
+  await typeAtEndOfLine(page, 'This paragraph comes from the main file.', ' AFTERCRASH.')
+  await page.waitForTimeout(1000)
+  await recompile(page)
+  const afterCrash = await con.waitFor(/compiled .* locally|local compile failed/, n9)
+  await check('after an engine crash the engine restarts and compiles locally', /locally: success/.test(afterCrash) && con.lines.slice(n9).some(l => /engine crashed and was restarted/.test(l)), afterCrash)
+  await check('the PDF after the crash has the edit', await waitForPdfText(page, 'AFTERCRASH'))
+
+  // 10. Nothing was compiled on the server.
   await check('no compile request reached the server', serverCompiles.length === 0, serverCompiles.join(', '))
   await tab2.close()
 } catch (e) {

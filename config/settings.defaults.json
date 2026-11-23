@@ -66,5 +66,7 @@
   "$statusPosition": "Where the progress chip appears: a screen corner, 'toolbar' (next to Overleaf's download button), or 'custom' (where you dragged it).",
   "statusX": -1,
   "statusY": -1,
-  "$statusX": "Dragged position of the chip as a fraction of the window width/height (-1: not dragged yet)."
+  "$statusX": "Dragged position of the chip as a fraction of the window width/height (-1: not dragged yet).",
+  "serverOnShellEscape": true,
+  "$serverOnShellEscape": "Compile on the server if the document needs shell escape (minted, svg, gnuplot, …), which the local engine doesn't have."
 }

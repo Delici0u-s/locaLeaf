@@ -30,7 +30,9 @@ if (!existsSync(join(vendor, '.version'))) {
 rmSync(DIST, { recursive: true, force: true })
 mkdirSync(DIST, { recursive: true })
 
-const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'none' }
+// Test-only hooks (simulating an engine crash) exist only in test builds: OLR_TEST_HOOKS=1.
+const TEST_HOOKS = process.env.OLR_TEST_HOOKS === '1'
+const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'none', define: { __TEST_HOOKS__: String(TEST_HOOKS) } }
 await Promise.all([
   build({ ...common, entryPoints: [join(SRC, 'background/background.ts')], outfile: join(DIST, 'background.js'), format: 'esm' }),
   build({ ...common, entryPoints: [join(SRC, 'content/content.ts')], outfile: join(DIST, 'content.js'), format: 'iife' }),

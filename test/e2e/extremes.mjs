@@ -66,6 +66,8 @@ const check = async (name, ok, detail = '') => {
   failures++
   // What the extension saw: the last local compile's errors.
   const last = page ? await page.evaluate(() => window.__localeaf?.lastCompile()).catch(() => null) : null
+  const paths = page ? await page.evaluate(() => window.__localeaf?.mirrorPaths().filter(p => p.startsWith('kapitel'))).catch(() => null) : null
+  if (paths) h.step(`  mirror paths: ${JSON.stringify(paths)}`)
   if (last) h.step(`  last compile: ${last.status}, ${last.errors} errors\n    ${last.log.split('\n').filter(l => l.startsWith('!')).slice(0, 5).join('\n    ')}`)
   await h.saveArtifacts(`check failed: ${name}`)
 }

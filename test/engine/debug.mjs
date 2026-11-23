@@ -15,7 +15,7 @@ const dir = resolve(dirArg)
 const HERE = join(ROOT, 'test/engine')
 const engineCfg = readJson('config/engine.json')
 const defaults = readJson('config/settings.defaults.json')
-await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', outfile: join(HERE, '.build/engine-worker.js'), logLevel: 'warning' })
+await build({ entryPoints: [join(ROOT, 'extension/src/engine/worker.ts')], bundle: true, format: 'iife', define: { __TEST_HOOKS__: 'true' }, outfile: join(HERE, '.build/engine-worker.js'), logLevel: 'warning' })
 const server = await serve({ '/ctan/': { proxy: defaults.ctanMirror, cacheDir: join(ROOT, 'test/.cache/ctan') }, '/config/': join(ROOT, 'config'), '/build/': join(HERE, '.build'), '/vendor/busytex/': join(ROOT, engineCfg.vendorDir), '/project/': dir, '/page/': HERE })
 const { context, close } = await launch()
 try {

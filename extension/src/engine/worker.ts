@@ -3,7 +3,7 @@
 // keeps its files in the in-memory FS between compiles, so recompiles only write what changed.
 import type { CompileMessage, CompileResult, EngineSettings, FromWorker, SyncMessage, ToWorker } from './protocol'
 import { kpseFormat, packageFiles } from './ctan'
-import { applyDraft, bibtexKey, countErrors, dirname, extname, fontKey, hashBytes, joinPath, missingFiles, missingFonts, missingPackages, sameSnapshot } from './latexmk'
+import { applyDraft, bibtexKey, countErrors, dirname, extname, fontKey, hashBytes, joinPath, missingFiles, missingFonts, missingPackages, needsShellEscape, sameSnapshot } from './latexmk'
 
 // Typed loosely: the project compiles with the DOM lib, not WebWorker.
 declare const self: {
@@ -58,6 +58,10 @@ self.onmessage = async ({ data }: MessageEvent<ToWorker>) => {
     else if (data.type === 'compile') {
       const result = await compile(data)
       post({ type: 'compiled', id: data.id, result }, Object.values(result.files).map(f => f.buffer as ArrayBuffer))
+    } else if (data.type === 'debugAbort' && __TEST_HOOKS__) {
+      // Wipe the module's memory: every later TeX run dies with a RuntimeError, as after an out-of-memory abort.
+      Module.HEAPU8.fill(0)
+      post({ type: 'cleared', projectId: '' })
     } else if (data.type === 'clear') {
       clear(data.projectId)
       post({ type: 'cleared', projectId: data.projectId })
@@ -184,7 +188,7 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   const optionsKey = JSON.stringify([msg.main, msg.compiler, msg.draft, msg.stopOnFirstError])
 
   if (!st.sources.has(msg.main)) {
-    return { status: 'failure', files: {}, passes: [], errors: 0, ms: 0, cached: false, outputDir: '', projectRoot: root, missingFonts: [], missingPackages: [], message: `main document ${msg.main} not found in project` }
+    return { status: 'failure', files: {}, passes: [], errors: 0, ms: 0, cached: false, outputDir: '', projectRoot: root, missingFonts: [], missingPackages: [], needsShellEscape: false, message: `main document ${msg.main} not found in project` }
   }
   if (!st.dirty && st.lastKey === optionsKey && st.lastResult) {
     return { ...st.lastResult, files: { ...cloneFiles(st.lastResult.files) }, cached: true, ms: performance.now() - t0 }
@@ -258,7 +262,7 @@ async function compile(msg: CompileMessage): Promise<CompileResult> {
   const errors = countErrors(finalLog)
   const packages = missingPackages(missingFiles(finalLog), st.sources.keys())
   const status = halted ? 'stopped-on-first-error' : files[`${JOB}.pdf`] ? 'success' : 'failure'
-  const result: CompileResult = { status, files, passes, errors, ms: performance.now() - t0, cached: false, outputDir: outDirRel, projectRoot: root, missingFonts: fonts, missingPackages: packages }
+  const result: CompileResult = { status, files, passes, errors, ms: performance.now() - t0, cached: false, outputDir: outDirRel, projectRoot: root, missingFonts: fonts, missingPackages: packages, needsShellEscape: needsShellEscape(finalLog) }
   st.dirty = false
   st.lastKey = optionsKey
   st.lastResult = { ...result, files: cloneFiles(files) }

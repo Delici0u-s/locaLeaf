@@ -69,7 +69,10 @@ export interface ClearMessage {
   projectId: string
 }
 
-export type ToWorker = InitMessage | SyncMessage | CompileMessage | ClearMessage
+/** Test builds only: breaks the WASM module for good, like an out-of-memory abort would. */
+export interface DebugAbortMessage { type: 'debugAbort' }
+
+export type ToWorker = InitMessage | SyncMessage | CompileMessage | ClearMessage | DebugAbortMessage
 
 export type CompileStatus = 'success' | 'failure' | 'stopped-on-first-error' | 'error'
 
@@ -90,6 +93,8 @@ export interface CompileResult {
   missingFonts: string[]
   /** TeX Live files the document needs that the engine couldn't get (the PDF would be incomplete). */
   missingPackages: string[]
+  /** The document needs shell escape (e.g. minted), which the engine doesn't have. */
+  needsShellEscape: boolean
   message?: string
 }
 

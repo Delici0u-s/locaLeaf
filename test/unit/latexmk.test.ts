@@ -62,3 +62,11 @@ test('a missing package is not a mistyped project file', () => {
   const sources = ['main.tex', 'chapters/intro.tex', 'mystyle.sty']
   assert.deepEqual(missingPackages(['kaobook.cls', 'chapterz/intro', 'mystyle.sty', 'abcr8t.tfm'], sources), ['kaobook.cls', 'abcr8t.tfm'])
 })
+
+import { needsShellEscape } from '../../extension/src/engine/latexmk'
+
+test('shell escape is only reported when it caused errors', () => {
+  const minted = 'Package shellesc Warning: Shell escape disabled on input line 73.\n! Package minted Error: Cannot highlight code (minted executable is unavailable\n'
+  assert.equal(needsShellEscape(minted), true)
+  assert.equal(needsShellEscape('Package shellesc Warning: Shell escape disabled on input line 73.\nno errors here\n'), false)
+})

@@ -113,6 +113,15 @@
       "$note": "A missing \\input aborts TeX in batch mode (same on Overleaf's server): no PDF, but not a missing package either."
     },
     {
+      "name": "minted-shell-escape",
+      "project": "minted",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "needsShellEscape": true
+      }
+    },
+    {
       "name": "fixture:ieee-journal",
       "fixture": "ieee-journal",
       "expect": {

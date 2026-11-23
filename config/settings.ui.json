@@ -15,6 +15,7 @@
         "fallbackToServer",
         "serverOnMissingPackages",
         "serverOnMissingFonts",
+        "serverOnShellEscape",
         "localTimeoutSeconds"
       ]
     },
@@ -131,6 +132,10 @@
     "engine.biberArgs": {
       "label": "Extra biber arguments",
       "help": "Comma separated."
+    },
+    "serverOnShellEscape": {
+      "label": "…if the document needs shell escape",
+      "help": "minted, svg, gnuplot: the local engine can't run external programs."
     }
   }
 }

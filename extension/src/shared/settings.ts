@@ -20,6 +20,7 @@ export interface Settings {
   joinTimeoutMs: number
   maxRetryAfterMs: number
   serverOnMissingPackages: boolean
+  serverOnShellEscape: boolean
   ctanMirror: string
   localTimeoutSeconds: number
   statusDelayMs: number

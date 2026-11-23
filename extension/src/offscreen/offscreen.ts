@@ -20,6 +20,8 @@ let ready: Promise<void> = Promise.resolve()
 let pending: { resolve: (m: FromWorker) => void; reject: (e: Error) => void } | null = null
 let queue: Promise<unknown> = Promise.resolve()
 let compileId = 0
+/** Errors after which the WASM module is unusable. */
+const FATAL = /abort|RuntimeError|out of memory|memory access out of bounds|unreachable|crashed/i
 /** Where progress of the request being handled goes (its tab). */
 let notify: ((text: string) => void) | null = null
 /** Bumped by stop(): compiles queued before the stop are dropped instead of run on the new worker. */
@@ -79,8 +81,21 @@ async function handle(req: EngineRequest, gen: number): Promise<EngineReply> {
       }
       return { kind: 'synced', epoch }
     }
+    case 'debugAbort':
+      if (__TEST_HOOKS__) await call({ type: 'debugAbort' })
+      return { kind: 'ok' }
     case 'compile': {
-      const reply = await call({ type: 'compile', id: ++compileId, projectId: req.projectId, ...req.options })
+      let reply
+      try {
+        reply = await call({ type: 'compile', id: ++compileId, projectId: req.projectId, ...req.options })
+      } catch (e: any) {
+        // An aborted WASM module (out of memory, …) fails every later call: start a fresh engine.
+        if (FATAL.test(String(e?.message ?? e))) {
+          startWorker()
+          throw new Error(`engine crashed and was restarted: ${String(e?.message ?? e).split('\n')[0]}`)
+        }
+        throw e
+      }
       if (reply.type !== 'compiled') throw new Error(`unexpected engine reply ${reply.type}`)
       const r = reply.result
       const result: WireCompileResult = { ...r, files: Object.fromEntries(Object.entries(r.files).map(([k, v]) => [k, toBase64(v)])) }

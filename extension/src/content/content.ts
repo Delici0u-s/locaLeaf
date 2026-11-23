@@ -95,6 +95,8 @@ async function handle(req: PageRequest): Promise<unknown> {
       return engine({ type: 'stop' })
     case 'clear':
       return engine({ type: 'clear', projectId: req.projectId })
+    case 'debugAbort':
+      return engine({ type: 'debugAbort' })
     case 'status':
       return chrome.runtime.sendMessage({ ...req, type: 'status' })
   }

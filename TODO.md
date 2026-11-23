@@ -23,9 +23,16 @@
 
 - [x] Time limit for local compiles, then fall back to the server (`localTimeoutSeconds`, default 240).
 - [x] Size limit for CTAN package downloads (`engine.maxCtanPackageMB`, default 60) and a download timeout.
-- [ ] Out-of-memory in the engine (untested).
-- [ ] `minted` / shell-escape: confirm it falls back to the server cleanly.
+- [x] Engine crash / out-of-memory: an aborted WASM module (out of memory, RuntimeError, …) used to break every
+  later compile. The offscreen document now restarts the engine and the page retries once locally (e2e test
+  simulates it with a test-build-only hook).
+- [x] `minted` / shell-escape: detected (errors + shell-escape messages) and compiled on the server
+  (`serverOnShellEscape`); engine test case.
 - [ ] Root cause of the intermittent "TeX capacity exceeded" after fetching fonts (worked around by a retry).
+
+- [ ] Intermittent: compile right after renaming a file missed the new name (2 of ~10 full-suite runs). Mitigated by
+  applying tree changes from Overleaf's own requests and waiting for in-flight ones in the compile barrier;
+  "file tree: … applied" is now logged to see the order if it shows up again.
 
 ## Nice to have
 

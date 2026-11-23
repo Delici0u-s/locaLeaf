@@ -19,6 +19,7 @@ export type PageRequest =
   | { type: 'compile'; projectId: string; clientId: string; sync: SyncPayload; options: CompileOptions; expectEpoch: number | null }
   | { type: 'stop' }
   | { type: 'clear'; projectId: string }
+  | { type: 'debugAbort' }
   /** Merges into the stored settings (e.g. where the progress chip was dragged). */
   | { type: 'updateSettings'; patch: Partial<Settings> }
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
@@ -44,6 +45,7 @@ export type EngineRequest =
   | { type: 'compile'; projectId: string; options: CompileOptions }
   | { type: 'stop' }
   | { type: 'clear'; projectId: string }
+  | { type: 'debugAbort' }
 
 export type WireCompileResult = Omit<CompileResult, 'files'> & { files: Record<string, string> }
 

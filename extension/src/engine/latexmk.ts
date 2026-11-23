@@ -41,6 +41,13 @@ export function countErrors(log: string): number {
   return n
 }
 
+/** Errors caused by packages that run external programs (minted, svg/Inkscape, gnuplot, …): the WASM engine has no
+ *  shell escape, Overleaf's server may. Only counts when the log has errors. */
+export function needsShellEscape(log: string): boolean {
+  if (countErrors(log) === 0) return false
+  return /Shell escape disabled|-shell-escape|shell escape|executable is unavailable|\\write18/i.test(log)
+}
+
 /** Font names fontspec couldn't find ("The font "X" cannot be found"), from a TeX log. */
 export function missingFonts(log: string): string[] {
   const joined = log.replace(/\n\(fontspec\)\s+/g, ' ')
