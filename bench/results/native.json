@@ -1,0 +1,238 @@
+{
+  "kind": "native",
+  "date": "2026-11-22T22:48:54.885Z",
+  "results": {
+    "image": "texlive/texlive:latest",
+    "fixtures": [
+      {
+        "name": "ieee-journal",
+        "compiler": "pdflatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 820.946979,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 55331
+          },
+          {
+            "step": "unchanged",
+            "ms": 165.79793700000005,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 55331
+          },
+          {
+            "step": "edit1",
+            "ms": 442.630265,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 55355
+          },
+          {
+            "step": "edit2",
+            "ms": 438.14064499999995,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 55365
+          }
+        ]
+      },
+      {
+        "name": "metropolis-demo",
+        "compiler": "pdflatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 7093.209537999999,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 195272
+          },
+          {
+            "step": "unchanged",
+            "ms": 179.75624400000015,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 195272
+          },
+          {
+            "step": "edit1",
+            "ms": 4713.939193,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 195481
+          },
+          {
+            "step": "edit2",
+            "ms": 2409.8963399999993,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 195498
+          }
+        ]
+      },
+      {
+        "name": "lshort",
+        "compiler": "xelatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 21702.570365999996,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 643310
+          },
+          {
+            "step": "unchanged",
+            "ms": 180.70904800000426,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 643310
+          },
+          {
+            "step": "edit1",
+            "ms": 5027.030699999996,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 643329
+          },
+          {
+            "step": "edit2",
+            "ms": 4720.901397000001,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 643338
+          }
+        ]
+      },
+      {
+        "name": "kaobook-docs",
+        "compiler": "pdflatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 277.8646410000001,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "unchanged",
+            "ms": 160.3182039999956,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "edit1",
+            "ms": 277.3553649999958,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "edit2",
+            "ms": 275.5469280000034,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          }
+        ]
+      },
+      {
+        "name": "kaobook-minimal-lua",
+        "compiler": "lualatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 664.0793230000054,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "unchanged",
+            "ms": 164.05686799999967,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "edit1",
+            "ms": 593.956938999996,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          },
+          {
+            "step": "edit2",
+            "ms": 587.7811310000034,
+            "exitCode": 12,
+            "success": false,
+            "rebuilt": false,
+            "pdfBytes": 0
+          }
+        ]
+      },
+      {
+        "name": "awesome-cv",
+        "compiler": "lualatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 32048.200259999998,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 57804
+          },
+          {
+            "step": "unchanged",
+            "ms": 369.93332999999984,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 57804
+          },
+          {
+            "step": "edit1",
+            "ms": 11020.990570000009,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 57828
+          },
+          {
+            "step": "edit2",
+            "ms": 10761.346867,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 57843
+          }
+        ]
+      }
+    ],
+    "texVersion": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)"
+  }
+}

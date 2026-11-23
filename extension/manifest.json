@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Overleaf local render",
+  "version": "0.1.0",
+  "description": "Compiles Overleaf projects on your machine (TeX Live in WebAssembly) and shows the result in Overleaf's own preview.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "unlimitedStorage", "offscreen", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Overleaf local render", "default_popup": "popup.html" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

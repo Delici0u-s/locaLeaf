@@ -1,0 +1,19 @@
+{
+  "$comment": "Test time limits (ms). 'deadline' is the hard limit for a whole test script: when it passes, the harness saves screenshots + logs to test/.artifacts/ and exits with code 124. 'step' bounds each wait inside a test. Override per run with OLR_TEST_DEADLINE_MS / OLR_TEST_STEP_MS.",
+  "deadline": {
+    "e2e": 600000,
+    "e2e-fixtures": 1500000,
+    "e2e-extremes": 1200000,
+    "engine": 1800000,
+    "default": 600000
+  },
+  "step": {
+    "default": 180000,
+    "e2e-fixtures": 300000,
+    "e2e-extremes": 420000,
+    "engine": 300000
+  },
+  "preflightMs": 10000,
+  "pdfTextMs": 60000,
+  "$pdfTextMs": "How long a test waits for a text to appear in the rendered PDF."
+}

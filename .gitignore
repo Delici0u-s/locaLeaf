@@ -1,0 +1,11 @@
+node_modules/
+bench/assets/
+bench/fixtures/
+bench/build/
+bench/zips/
+dev/overleaf-ce/.env
+vendor/
+dist/
+test/engine/.build/
+test/unit/.build/
+test/.artifacts/

@@ -1,0 +1,122 @@
+{
+  "$comment": "Engine test cases. 'project' is under test/engine/projects, 'fixture' under bench/fixtures (see bench/fixtures.json for main/compiler/edit). 'expect' is checked after the first compile.",
+  "cases": [
+    {
+      "name": "errors-continue",
+      "project": "errors",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "success",
+        "minErrors": 1
+      }
+    },
+    {
+      "name": "errors-halt",
+      "project": "errors",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "stopOnFirstError": true,
+      "expect": {
+        "status": "stopped-on-first-error"
+      }
+    },
+    {
+      "name": "subfolder-main",
+      "project": "subfolder",
+      "main": "doc/main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "success",
+        "errors": 0,
+        "logLacks": [
+          "undefined"
+        ]
+      }
+    },
+    {
+      "name": "bibtex-subdir-bib",
+      "project": "bibtex",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "success",
+        "errors": 0,
+        "logLacks": [
+          "undefined"
+        ]
+      }
+    },
+    {
+      "name": "draft",
+      "project": "draft",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "draft": true,
+      "expect": {
+        "status": "success",
+        "errors": 0
+      }
+    },
+    {
+      "name": "fonts-fira-lualatex",
+      "project": "fonts-fira",
+      "main": "main.tex",
+      "compiler": "lualatex",
+      "expect": {
+        "status": "success",
+        "errors": 0,
+        "missingFonts": "none"
+      }
+    },
+    {
+      "name": "fonts-fira-xelatex",
+      "project": "fonts-fira",
+      "main": "main.tex",
+      "compiler": "xelatex",
+      "expect": {
+        "status": "success",
+        "errors": 0,
+        "missingFonts": "none"
+      }
+    },
+    {
+      "name": "fixture:ieee-journal",
+      "fixture": "ieee-journal",
+      "expect": {
+        "status": "success"
+      }
+    },
+    {
+      "name": "fixture:metropolis-demo",
+      "fixture": "metropolis-demo",
+      "expect": {
+        "status": "success"
+      }
+    },
+    {
+      "name": "fixture:cleanthesis",
+      "fixture": "cleanthesis",
+      "expect": {
+        "status": "success",
+        "errors": 0
+      }
+    },
+    {
+      "name": "fixture:lshort",
+      "fixture": "lshort",
+      "expect": {
+        "status": "success"
+      }
+    },
+    {
+      "name": "fixture:awesome-cv",
+      "fixture": "awesome-cv",
+      "expect": {
+        "status": "success",
+        "missingFonts": "some"
+      },
+      "$note": "Source Sans 3 / Roboto aren't on the package server: the engine must report them so the page compiles on the server instead."
+    }
+  ]
+}

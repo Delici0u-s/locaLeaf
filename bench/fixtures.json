@@ -1,0 +1,79 @@
+{
+  "$comment": "Public LaTeX projects used to benchmark compile times. Each becomes an Overleaf-like project root in fixtures/<name>/. 'source.path' is the folder inside the download that becomes the project root; 'move' relocates files so the main file sits where an Overleaf project would have it. The incremental test adds one line to 'edit' (default: the main file): before \\end{document} if the file has one, else at its end. 'include' lists extra files (relative to the download root) copied into the project root, e.g. a class that isn't in TeX Live and would be uploaded to Overleaf with the project.",
+  "fixtures": [
+    {
+      "name": "ieee-journal",
+      "kind": "simple article (IEEEtran)",
+      "source": {
+        "type": "archive",
+        "url": "https://mirrors.ctan.org/macros/latex/contrib/IEEEtran.zip",
+        "path": "IEEEtran"
+      },
+      "main": "bare_jrnl.tex",
+      "compiler": "pdflatex",
+      "tools": {}
+    },
+    {
+      "name": "metropolis-demo",
+      "kind": "beamer presentation (metropolis, pgfplots, bibtex)",
+      "source": {
+        "type": "git",
+        "repo": "https://github.com/matze/mtheme.git",
+        "path": "demo"
+      },
+      "main": "demo.tex",
+      "compiler": "pdflatex",
+      "tools": {
+        "bibtex": true
+      }
+    },
+    {
+      "name": "lshort",
+      "kind": "book, ~200 pages (The Not So Short Introduction to LaTeX, XeLaTeX, makeindex)",
+      "source": {
+        "type": "archive",
+        "url": "https://mirrors.ctan.org/info/lshort/english/lshort-6.4.src.tar.gz",
+        "path": "lshort-6.4/src"
+      },
+      "main": "lshort.tex",
+      "compiler": "xelatex",
+      "tools": {
+        "makeindex": true
+      },
+      "edit": "typeset.tex"
+    },
+    {
+      "name": "cleanthesis",
+      "kind": "thesis (cleanthesis example: biblatex/biber, ~10 chapters, figures)",
+      "source": {
+        "type": "git",
+        "repo": "https://github.com/derric/cleanthesis.git",
+        "path": "example-thesis"
+      },
+      "include": [
+        "cleanthesis.sty"
+      ],
+      "main": "my-thesis.tex",
+      "edit": "content/chapter-introduction.tex",
+      "compiler": "pdflatex",
+      "tools": {
+        "biber": true
+      }
+    },
+    {
+      "name": "awesome-cv",
+      "kind": "CV with LuaLaTeX (fontspec: Source Sans 3 + Roboto, Font Awesome)",
+      "source": {
+        "type": "git",
+        "repo": "https://github.com/posquit0/Awesome-CV.git",
+        "path": "."
+      },
+      "move": {
+        "examples/resume.tex": "resume.tex"
+      },
+      "main": "resume.tex",
+      "compiler": "lualatex",
+      "tools": {}
+    }
+  ]
+}

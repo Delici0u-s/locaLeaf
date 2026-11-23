@@ -1,0 +1,46 @@
+{
+  "$comment": "Settings for the milestone-0 benchmark. Paths are relative to bench/.",
+  "editRounds": 2,
+  "wasm": {
+    "assetsPath": "assets/busytex",
+    "preloadDataPackages": [
+      "texlive-recommended.js"
+    ],
+    "rerun": true,
+    "browserCandidates": [
+      "brave-browser",
+      "brave",
+      "chromium",
+      "google-chrome"
+    ],
+    "compileTimeoutSeconds": 600,
+    "remoteEndpoint": "https://texlive2026.texlyre.org",
+    "$remoteEndpoint": "On-demand TeX Live 2026 package server for anything outside the preloaded bundle (TeXlyre's public one; self-hostable via texlyre-busytex-build). Empty string disables it.",
+    "incremental": {
+      "$comment": "Prototype of our own rerun logic: keep generated files, single passes, rerun while any file matching rerunOn changed.",
+      "maxPasses": 4,
+      "rerunOn": [
+        "\\\\.(aux|toc|lof|lot|out|nav|snm|bbl|ind|gls)$"
+      ],
+      "skipGenerated": [
+        "\\\\.(pdf|log|synctex\\\\.gz|xdv|blg|ilg|fls)$"
+      ]
+    }
+  },
+  "native": {
+    "image": "texlive/texlive:latest",
+    "latexmkFlags": [
+      "-cd",
+      "-jobname=output",
+      "-synctex=1",
+      "-interaction=batchmode",
+      "-time"
+    ],
+    "compilerFlags": {
+      "pdflatex": "-pdf",
+      "xelatex": "-xelatex",
+      "lualatex": "-lualatex",
+      "latex": "-pdfdvi"
+    }
+  }
+}

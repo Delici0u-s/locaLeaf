@@ -1,0 +1,26 @@
+{
+  "name": "overleaf-local-render",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser extension that compiles Overleaf projects locally (TeX Live in WebAssembly) and shows the result in Overleaf's own preview.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "assets": "node scripts/fetch-engine-assets.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "test:unit": "node test/unit/run.mjs",
+    "test:engine": "node test/engine/run.mjs",
+    "test:e2e": "node test/e2e/run.mjs",
+    "test:e2e:extremes": "node test/e2e/extremes.mjs",
+    "test:e2e:fixtures": "node test/e2e/fixtures.mjs",
+    "test:all": "npm run -s typecheck && npm run -s test:unit && npm run -s test:engine && npm run -s test:e2e && npm run -s test:e2e:extremes && npm run -s test:e2e:fixtures"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.65.1",
+    "typescript": "^7.0.2"
+  }
+}

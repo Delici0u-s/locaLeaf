@@ -1,0 +1,54 @@
+# Local Overleaf Community Edition for developing and testing the extension end to end.
+# Start: docker compose -f dev/overleaf-ce/compose.yml up -d   → http://localhost:${OLR_DEV_PORT:-8090}
+# First admin account: open /launchpad (the e2e setup script does this automatically).
+# All data lives in this compose project's named volumes; `down -v` deletes it.
+name: olr-overleaf-ce
+
+services:
+  sharelatex:
+    image: ${OLR_DEV_OVERLEAF_IMAGE:-sharelatex/sharelatex:latest}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${OLR_DEV_PORT:-8090}:80"
+    stop_grace_period: 60s
+    volumes:
+      - overleaf_data:/var/lib/overleaf
+    environment:
+      OVERLEAF_APP_NAME: Overleaf CE (olr dev)
+      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+      OVERLEAF_REDIS_HOST: redis
+      REDIS_HOST: redis
+      EMAIL_CONFIRMATION_DISABLED: "true"
+      OVERLEAF_SITE_URL: http://localhost:${OLR_DEV_PORT:-8090}
+      # Generated once into the git-ignored .env next to this file (see dev/overleaf-ce/README.md).
+      OVERLEAF_INVITE_TOKEN_SECRET: "${OLR_DEV_INVITE_TOKEN_SECRET:?missing, see dev/overleaf-ce/README.md}"
+
+  mongo:
+    image: mongo:8.0
+    command: "--replSet overleaf"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongodb-init-replica-set.js:/docker-entrypoint-initdb.d/mongodb-init-replica-set.js:ro,z
+    environment:
+      MONGO_INITDB_DATABASE: sharelatex
+    extra_hosts:
+      - mongo:127.0.0.1
+    healthcheck:
+      test: echo 'db.stats().ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7.4
+    volumes:
+      - redis_data:/data
+
+volumes:
+  overleaf_data:
+  mongo_data:
+  redis_data:

@@ -1,0 +1,17 @@
+{
+  "name": "olr-bench",
+  "private": true,
+  "type": "module",
+  "description": "Milestone 0: WASM TeX vs native latexmk compile timings on public projects",
+  "scripts": {
+    "assets": "texlyre-busytex download-assets assets",
+    "fixtures": "node scripts/fetch-fixtures.mjs",
+    "wasm": "node scripts/run-wasm.mjs",
+    "native": "node scripts/run-native.mjs",
+    "zips": "node scripts/zip-fixtures.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.57.0",
+    "texlyre-busytex": "1.4.1"
+  }
+}

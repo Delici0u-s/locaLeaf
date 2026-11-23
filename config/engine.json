@@ -1,0 +1,8 @@
+{
+  "$comment": "TeX engine (texlyre-busytex, TeX Live 2026 in WebAssembly). 'bundles' are the TeX Live data bundles shipped in the extension and preloaded; everything else comes on demand from remoteEndpoint (setting).",
+  "busytexVersion": "1.4.1",
+  "releaseUrl": "https://github.com/TeXlyre/texlyre-busytex/releases/download/assets-v{version}/busytex-assets.tar.gz",
+  "vendorDir": "vendor/busytex",
+  "engineFiles": ["busytex.js", "busytex.wasm", "busytex_pipeline.js", "busytex_biber.js", "biber.js", "biber.wasm", "biber.data"],
+  "bundles": ["texlive-recommended"]
+}

@@ -1,0 +1,53 @@
+{
+  "$comment": "Default user settings (one home; the popup can override them, stored in chrome.storage.local).",
+  "remoteEndpoint": "https://texlive2026.texlyre.org",
+  "engine": {
+    "maxPasses": 5,
+    "rerunExtensions": [
+      "aux",
+      "toc",
+      "lof",
+      "lot",
+      "out",
+      "nav",
+      "snm",
+      "bbl",
+      "ind",
+      "gls",
+      "vrb",
+      "brf"
+    ],
+    "biberArgs": [
+      "--output-safechars"
+    ],
+    "outputExtensions": [
+      "blg",
+      "aux",
+      "bbl"
+    ],
+    "$biberArgs": "--output-safechars works around a biber-wasm bug: non-ASCII from LaTeX macros (e.g. {\\\"u}) is emitted decomposed and double UTF-8 encoded, which LaTeX rejects (U+0088). Remaining glitch: alphabetic labels (labelalpha) with such names stay garbled.",
+    "maxProjects": 4,
+    "$maxProjects": "Projects whose files the engine keeps in memory between compiles (least recently used ones are dropped and re-sent when needed).",
+    "fetchMissingFonts": true
+  },
+  "keepBuilds": 3,
+  "barrierTimeoutMs": 3000,
+  "joinConcurrency": 6,
+  "fallbackToServer": true,
+  "maxSyncChunkBytes": 33554432,
+  "$maxSyncChunkBytes": "Largest single message to the engine (Chrome's limit is 64 MB); bigger syncs are split.",
+  "fetchConcurrency": 4,
+  "historyOtRefetchMs": 300,
+  "toastMs": 8000,
+  "engineIdleMinutes": 15,
+  "$engineIdleMinutes": "Close the engine (frees its memory) when no Overleaf tab used it for this long; 0 keeps it running.",
+  "serverOnMissingFonts": true,
+  "$serverOnMissingFonts": "If fonts fontspec asks for can't be provided locally, compile on the server instead (the local PDF would use a fallback font).",
+  "joinRetries": 4,
+  "joinRetryDelayMs": 1000,
+  "$joinRetries": "Attempts per document join or file download before giving up (busy servers time out or rate-limit now and then); the delay doubles each retry unless the server says how long to wait.",
+  "joinTimeoutMs": 30000,
+  "$joinTimeoutMs": "How long to wait for the server to answer a joinDoc before retrying.",
+  "maxRetryAfterMs": 30000,
+  "$maxRetryAfterMs": "Longest Retry-After (server rate limit) the extension waits for before giving up on a download."
+}

@@ -1,0 +1,48 @@
+{
+  "kind": "native-cleanthesis",
+  "date": "2026-11-22T22:58:02.375Z",
+  "results": {
+    "image": "texlive/texlive:latest",
+    "fixtures": [
+      {
+        "name": "cleanthesis",
+        "compiler": "pdflatex",
+        "runs": [
+          {
+            "step": "first",
+            "ms": 11327.103329,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 367665
+          },
+          {
+            "step": "unchanged",
+            "ms": 173.3445389999997,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 367665
+          },
+          {
+            "step": "edit1",
+            "ms": 2378.9508459999997,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 367912
+          },
+          {
+            "step": "edit2",
+            "ms": 2400.477973000001,
+            "exitCode": 0,
+            "success": true,
+            "rebuilt": true,
+            "pdfBytes": 367918
+          }
+        ]
+      }
+    ],
+    "texVersion": "pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026)"
+  }
+}
