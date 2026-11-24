@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Browser extension that compiles Overleaf projects locally (TeX Live in WebAssembly) and shows the result in Overleaf's own preview.",
   "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/Delici0u-s/locaLeaf",
+  "repository": { "type": "git", "url": "https://github.com/Delici0u-s/locaLeaf.git" },
   "scripts": {
     "assets": "node scripts/fetch-engine-assets.mjs",
     "build": "node scripts/build.mjs",

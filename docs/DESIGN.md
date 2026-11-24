@@ -1,4 +1,9 @@
-# LocaLeaf: plan
+# LocaLeaf: design and research notes
+
+> [!NOTE]
+> The plan written before and during the build (November 2026), kept for the research into Overleaf's
+> internals and the reasoning behind the design. Status lines inside it are historical; for how LocaLeaf
+> behaves now, see the [README](../README.md).
 
 Goal: while the Overleaf editor is open in Chrome or Brave (on a slow self-hosted server), clicking
 **Recompile** (or an auto-compile) compiles the project **on this machine**. Preferably that happens
@@ -202,7 +207,7 @@ and later maybe `NativeBackend` (native messaging). The router picks one based o
 ### 4.3 Compiling in WASM
 
 > [!NOTE]
-> Measured in milestone 0 (`bench/RESULTS.md`): busytex's stock pipeline is 2–6× slower than native, because
+> Measured in milestone 0 ([BENCHMARKS.md](BENCHMARKS.md)): busytex's stock pipeline is 2–6× slower than native, because
 > it always runs ≥ 3 passes on a fresh filesystem and halts on the first error. Our rerun logic below,
 > prototyped in `bench/page/bench.js`, matches native for pdfLaTeX.
 
@@ -277,7 +282,7 @@ and later maybe `NativeBackend` (native messaging). The router picks one based o
 
 ## 6. Milestones
 
-0. ✅ **Benchmark gate (done 2026-11-22, see `bench/RESULTS.md`):** texlyre-busytex in Brave against native
+0. ✅ **Benchmark gate (done 2026-11-22, see [BENCHMARKS.md](BENCHMARKS.md)):** texlyre-busytex in Brave against native
    latexmk on public projects. With our own rerun logic, pdfLaTeX recompiles run at **native speed** (0.35 s
    for an article, 2.6–2.7 s for a beamer talk or thesis), and XeLaTeX at ~1.5× native. **WASM stays the plan.**
    Still open: the same projects timed on your server. Siglum wasn't tested (no LuaLaTeX, no biber).

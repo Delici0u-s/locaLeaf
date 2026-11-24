@@ -1,7 +1,7 @@
 // Builds a clean release (no localeaf.local.json sites, no dev origins) and zips it:
-// release/localeaf-<version>.zip. Install: unzip, then "Load unpacked" on the folder.
+// release/localeaf-<version>.zip, with LICENSE and THIRD_PARTY.md. Install: unzip, then "Load unpacked" on the folder.
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, readJson } from './lib.mjs'
 
@@ -12,6 +12,9 @@ execFileSync(process.execPath, [join(ROOT, 'scripts/build.mjs')], {
   // a release must not carry anyone's server address: ignore localeaf.local.json
   env: { ...process.env, OLR_DIST_DIR: dir, LOCALEAF_SITES: '', LOCALEAF_ANY_SITE: '0' },
 })
+// the license and third-party notices travel with the program (AGPL-3.0)
+copyFileSync(join(ROOT, 'LICENSE'), join(ROOT, dir, 'LICENSE'))
+copyFileSync(join(ROOT, 'docs/THIRD_PARTY.md'), join(ROOT, dir, 'THIRD_PARTY.md'))
 mkdirSync(join(ROOT, 'release'), { recursive: true })
 const zip = join(ROOT, 'release', `localeaf-${version}.zip`)
 rmSync(zip, { force: true })

@@ -1,10 +1,15 @@
-# Milestone 0: WASM TeX vs native latexmk (2026-11-22)
+# Benchmarks: WASM TeX vs native latexmk (2026-11-22)
+
+> [!NOTE]
+> Measured during the design phase, before most of LocaLeaf existed. Some problems found here are fixed since
+> (the Biber encoding bug, fonts chosen by family name), and later features make recompiles faster (builds
+> kept across restarts). For the current state see the [README](../README.md) and [CHANGELOG](CHANGELOG.md).
 
 Machine: this laptop (Fedora 43). Browser: Brave 1.100 (headless, via Playwright).
 WASM engine: texlyre-busytex 1.4.1 (TeX Live 2026), `texlive-recommended` bundle preloaded,
 other packages on demand from `texlive2026.texlyre.org`. Native: `texlive/texlive:latest`
 (TeX Live 2026) in a long-running Docker container, with Overleaf's exact CLSI latexmk flags.
-Raw data: `results/*.json`. Rerun with `npm run wasm` / `npm run native`.
+Raw data: `bench/results/*.json`. Rerun in `bench/` with `npm run wasm` / `npm run native`.
 
 **Steps:** *first* = cold compile of the project; *unchanged* = recompile with no change;
 *edit* = recompile after a one-line change (median of 2 edits).
@@ -60,5 +65,5 @@ xychart-beta
 
 ## Still missing: your server
 
-To make the decision on real numbers: upload the projects in `fixtures/` (zip each folder) to your
-Overleaf, set the compiler from `fixtures.json`, and time Recompile after a one-line edit.
+To make the decision on real numbers: upload the projects in `bench/fixtures/` (zip each folder) to your
+Overleaf, set the compiler from `bench/fixtures.json`, and time Recompile after a one-line edit.

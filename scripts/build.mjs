@@ -17,7 +17,7 @@ const LOCAL_CONFIG = join(ROOT, 'localeaf.local.json')
 const localConfig = existsSync(LOCAL_CONFIG) ? JSON.parse(readFileSync(LOCAL_CONFIG, 'utf8')) : {}
 const builtInSites = (process.env.LOCALEAF_SITES !== undefined ? process.env.LOCALEAF_SITES.split(',') : localConfig.sites ?? [])
   .map(s => s.trim()).filter(Boolean).map(s => new URL(s).origin)
-// "anySite": true grants access to all sites up front, so "Enable on this site" in the popup never needs a
+// "anySite": true grants access to all sites up front, so turning on a site in the popup never needs a
 // permission prompt. LocaLeaf still only runs on the sites you enable.
 const anySite = process.env.LOCALEAF_ANY_SITE !== undefined ? process.env.LOCALEAF_ANY_SITE === '1' : localConfig.anySite === true
 
@@ -35,7 +35,7 @@ const TEST_HOOKS = process.env.OLR_TEST_HOOKS === '1'
 // Test builds also change some setting defaults (config/test.json "extensionDefaults"), e.g. so tests that
 // check local-only compiling aren't raced by the server; a test that needs the real default sets it.
 const settingsOverrides = TEST_HOOKS ? readJson('config/test.json').extensionDefaults ?? {} : {}
-const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'none', define: { __TEST_HOOKS__: String(TEST_HOOKS), __SETTINGS_OVERRIDES__: JSON.stringify(settingsOverrides) } }
+const common = { bundle: true, target: 'chrome120', sourcemap: 'linked', logLevel: 'warning', legalComments: 'eof', define: { __TEST_HOOKS__: String(TEST_HOOKS), __SETTINGS_OVERRIDES__: JSON.stringify(settingsOverrides) } }
 await Promise.all([
   build({ ...common, entryPoints: [join(SRC, 'background/background.ts')], outfile: join(DIST, 'background.js'), format: 'esm' }),
   build({ ...common, entryPoints: [join(SRC, 'content/content.ts')], outfile: join(DIST, 'content.js'), format: 'iife' }),
