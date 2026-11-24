@@ -80,6 +80,8 @@
   "$serverOnShellEscape": "Compile on the server if the document needs shell escape (minted, svg, gnuplot, …), which the local engine doesn't have.",
   "liveUpdateMs": 300,
   "$liveUpdateMs": "How often the popup's live status may update while a compile reports progress.",
+  "badgeShowsLast": false,
+  "$badgeShowsLast": "The toolbar badge also shows where the last compile ran (L local, S server). Off: it only shows … (loading), TeX (compiling here) or SRV (compiling on the server); the popup says where the last compile ran.",
   "previewMs": 2500,
   "$previewMs": "How long the progress indicator is shown after changing its position.",
   "statusFallbackPosition": "bottom-left",

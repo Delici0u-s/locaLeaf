@@ -3,7 +3,7 @@
 // config/settings.ui.json; anything not described there appears under "Advanced").
 import ui from '../../../config/settings.ui.json'
 import { DEFAULT_SETTINGS, getStored, mergeSettings, type CompileStats, type ProjectMode } from '../shared/settings'
-import { liveKey, type LiveStatus } from '../shared/messages'
+import { lastKey, liveKey, type LastCompile, type LiveStatus } from '../shared/messages'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const h = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> & { class?: string } = {}, ...children: (Node | string)[]) => {
@@ -196,7 +196,12 @@ async function renderStats(projectId: string | null, liveTabId?: number) {
   const parts: Node[] = [h('h2', {}, liveTabId !== undefined || projectHas ? 'This project' : 'Compiles')]
   if (liveTabId !== undefined) {
     parts.push(tilesFor(s))
-    if (hasStats) parts.push(h('p', { class: 'muted' }, `All projects: ${total.local} local, ${total.server} on the server.`))
+    const last = (await chrome.storage.session.get(lastKey(liveTabId)))[lastKey(liveTabId)] as LastCompile | null | undefined
+    const lines = [
+      last ? `Last compile ${last.where === 'local' ? 'locally' : 'on server'}.` : '',
+      hasStats ? `All projects: ${total.local} local, ${total.server} on the server.` : '',
+    ].filter(Boolean)
+    if (lines.length) parts.push(h('p', { class: 'muted' }, ...lines.flatMap((l, i) => (i ? [h('br', {}), l] : [l]))))
   } else parts.push(tilesFor(total))
   el.replaceChildren(...parts)
 }

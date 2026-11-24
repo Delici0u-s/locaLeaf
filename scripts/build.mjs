@@ -83,6 +83,10 @@ if (builtInSites.length) {
 }
 if (anySite) {
   manifest.host_permissions = [...new Set([...(manifest.host_permissions ?? []), 'https://*/*', 'http://*/*'])]
+  // optional permissions already granted up front are redundant (the browser warns and drops them)
+  const granted = new Set(manifest.host_permissions)
+  manifest.optional_host_permissions = (manifest.optional_host_permissions ?? []).filter(p => !granted.has(p))
+  if (!manifest.optional_host_permissions.length) delete manifest.optional_host_permissions
   console.log('anySite: access to all sites granted up front (LocaLeaf only runs where you enable it)')
 }
 writeFileSync(join(DIST, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')

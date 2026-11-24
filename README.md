@@ -58,8 +58,10 @@ and reload the Overleaf tab.
 1. Open a project on your Overleaf server.
 2. Click the extension icon → **Enable on this site**. Your browser asks for access to that site and to
    the CTAN mirror (used for TeX Live packages the extension doesn't ship). The page reloads.
-3. Compile as usual. The badge shows **L** when the last compile ran locally and **S** when it fell
-   back to the server. In that case a notice in the page says why.
+3. Compile as usual. The toolbar badge shows **…** while the project loads, **TeX** while it compiles here
+   and **SRV** while the server compiles. Hover the icon for
+   what's happening now; the popup says where the last compile ran and why (a notice in the page also says
+   why a compile went to the server). With `badgeShowsLast` the badge keeps **L** (local) or **S** (server).
 
 Per project you can switch between compiling *locally* and *on the server* in the popup.
 The first compile after opening a project takes a few seconds longer, because the extension loads the whole
@@ -129,6 +131,7 @@ The popup lists every setting with its current value. Defaults live in
 | `serverOnMissingPackages` | true | Compile on the server if TeX Live packages can't be provided locally |
 | `raceWhileCold` | true | Until a tab's first local compile is done, the server compiles too and the first PDF wins |
 | `raceHeadStartMs` | 2000 | How long the local compile runs alone before the server joins the race |
+| `badgeShowsLast` | false | Toolbar badge also shows where the last compile ran (L/S); off: only …/TeX/SRV while busy |
 
 ## Limitations
 

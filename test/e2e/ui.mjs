@@ -45,6 +45,18 @@ try {
   await page.goto(`${OVERLEAF_URL}/project/${projectId}`)
   await h.waitFor('a local compile', () => logs.find(l => /compiled .* locally/.test(l)))
   const tabId = await sw.evaluate(u => chrome.tabs.query({}).then(ts => ts.find(t => t.url?.startsWith(u))?.id), `${OVERLEAF_URL}/project/${projectId}`)
+  const badgeOf = id => sw.evaluate(async t => ({ text: await chrome.action.getBadgeText({ tabId: t }), title: await chrome.action.getTitle({ tabId: t }) }), id)
+  const badgeIs = (id, text, re) => h.waitFor(`badge "${text}"`, async () => { const b = await badgeOf(id); return b.text === text && re.test(b.title) ? b : null }, 10000).then(b => [true, b], async () => [false, await badgeOf(id)])
+  {
+    const [ok, b] = await badgeIs(tabId, '', /last compile: done.*\(local\)/)
+    await check('toolbar badge: none after a compile (default), tooltip = the live status', ok, JSON.stringify(b))
+  }
+  await sw.evaluate(() => chrome.storage.local.set({ settings: { badgeShowsLast: true } }))
+  {
+    const [ok, b] = await badgeIs(tabId, 'L', /last compile/)
+    await check('with badgeShowsLast: L after a local compile', ok, JSON.stringify(b))
+  }
+  await sw.evaluate(() => chrome.storage.local.remove('settings'))
 
   h.step('opening the popup for the Overleaf tab')
   const popup = await context.newPage()
@@ -60,6 +72,8 @@ try {
   await check('project shows "Locally" selected', (await popup.locator('#project button[aria-pressed=true]').textContent()) === 'Locally')
   const firstTile = await popup.locator('#stats .tile:not(.now) .n').first().textContent()
   await check('statistics show the local compile', Number(firstTile) >= 1, firstTile ?? '')
+  const note = await popup.locator('#stats p.muted').textContent().catch(() => '')
+  await check('the note under the stats says where the last compile ran', /^Last compile locally\.\s*All projects:/.test(note ?? ''), note ?? '')
   const groups = await popup.locator('#groups details summary').allTextContents()
   await check('settings are grouped, unknown ones under Advanced', groups.length >= 5 && groups.at(-1) === 'Advanced', groups.join(' | '))
   await popup.locator('#groups details').first().evaluate(d => { d.open = true })
@@ -112,6 +126,10 @@ try {
   await popup2.goto(`chrome-extension://${extId}/popup.html?tabId=${slowTab}`)
   const nowCompiling = await h.waitFor('the Now tile during the compile', async () => { const t = await popup2.locator('#stats .tile.now').textContent(); return /Compiling/.test(t ?? '') ? t : null }).catch(() => '')
   await check('popup "Now" tile shows the running compile', /Compiling.*TeX pass/.test(nowCompiling), nowCompiling)
+  {
+    const [ok, b] = await badgeIs(slowTab, 'TeX', /TeX pass/)
+    await check('toolbar badge: TeX while compiling locally', ok, JSON.stringify(b))
+  }
   await popup2.screenshot({ path: join(ART, 'ui-popup-compiling.png') })
   await popup2.close()
   await check('by default the chip sits right of the download button', await nextToDownload(slow, chip))
@@ -142,7 +160,22 @@ try {
   await popup.locator('#project button:has-text("On the server")').click()
   const modes = await h.waitFor('project mode stored', () => sw.evaluate(() => chrome.storage.local.get('projectModes').then(r => r.projectModes)))
   await check('"On the server" stores the project mode', modes?.[projectId] === 'server', JSON.stringify(modes))
+  {
+    // the tab reloads in server mode: the new page starts with no badge (no stale L)
+    const [ok, b] = await badgeIs(tabId, '', /compiles on the server/)
+    await check('toolbar badge: none for a project switched to the server', ok, JSON.stringify(b))
+  }
   await sw.evaluate(() => chrome.storage.local.remove('projectModes'))
+
+  h.step('the project list (not a project): no badge')
+  const home = await context.newPage()
+  const homeLogs = h.track('home', home)
+  await home.goto(`${OVERLEAF_URL}/project`)
+  await h.waitFor('the page script to notice', () => homeLogs.find(l => /not a project page/.test(l)))
+  const homeTab = await sw.evaluate(u => chrome.tabs.query({}).then(ts => ts.find(t => t.url === u)?.id), `${OVERLEAF_URL}/project`)
+  await home.waitForTimeout(1000)
+  const hb = await badgeOf(homeTab)
+  await check('no badge outside a project', hb.text === '' && hb.title === 'LocaLeaf', JSON.stringify(hb))
 
 } catch (e) {
   await check('test ran to the end', false, String(e?.stack ?? e).slice(0, 800))

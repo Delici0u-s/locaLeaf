@@ -8,7 +8,8 @@
         "statusFallbackPosition",
         "statusDelayMs",
         "toastMs",
-        "previewMs"
+        "previewMs",
+        "badgeShowsLast"
       ]
     },
     {
@@ -139,6 +140,10 @@
     "engine.biberArgs": {
       "label": "Extra biber arguments",
       "help": "Comma separated."
+    },
+    "badgeShowsLast": {
+      "label": "Badge shows where the last compile ran",
+      "help": "L local, S server. Off: the badge only shows … (loading), TeX or SRV (compiling here / on the server)."
     },
     "raceWhileCold": {
       "label": "Race the server while warming up",

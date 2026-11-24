@@ -33,6 +33,7 @@ export interface Settings {
   engineStartTimeoutMs: number
   raceWhileCold: boolean
   raceHeadStartMs: number
+  badgeShowsLast: boolean
 }
 
 export type StatusPosition = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right' | 'toolbar' | 'custom'

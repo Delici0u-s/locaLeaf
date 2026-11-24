@@ -1,6 +1,6 @@
 // Background service worker: offscreen engine lifecycle, per-origin script registration, badge.
 import { EMPTY_STATS, STORAGE_KEYS, getStored, mergeSettings, type CompileStats } from '../shared/settings'
-import { liveKey, type BackgroundRequest } from '../shared/messages'
+import { lastKey, liveKey, type BackgroundRequest, type LastCompile, type LiveState } from '../shared/messages'
 import engineConfig from '../../../config/engine.json'
 
 const OFFSCREEN_URL = 'offscreen.html'
@@ -81,7 +81,7 @@ chrome.storage.onChanged.addListener(changes => {
   if (STORAGE_KEYS.origins in changes) registerScripts()
 })
 
-chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove(liveKey(tabId)) })
+chrome.tabs.onRemoved.addListener(tabId => { chrome.storage.session.remove([liveKey(tabId), lastKey(tabId)]) })
 
 // ---- compile statistics ----
 
@@ -105,10 +105,46 @@ function recordStats(projectId: string, where: 'local' | 'server', ms: number) {
 
 // ---- messages ----
 
-const BADGE: Record<string, { text: string; color: string }> = {
-  local: { text: 'L', color: '#138a36' },
-  fallback: { text: 'S', color: '#b35c00' },
-  idle: { text: '', color: '#000000' },
+// Toolbar badge, per tab: "…" while loading the project, "TeX" while compiling here, "SRV" on the server; with settings.badgeShowsLast also where the last
+// compile ran (L local, S server). The tooltip is the popup's live "Now" text. The tab's last compile (where,
+// why) is kept for the popup too. Chrome clears the badge when the tab navigates; a new page starts fresh.
+type Where = LastCompile['where']
+const BADGE_COLORS: Record<Where | 'busy', string> = { local: '#138a36', server: '#b35c00', busy: '#5f665f' }
+const BADGE_TEXT: Record<Where, string> = { local: 'L', server: 'S' }
+/** What the badge shows while the tab is busy: loading the project, compiling here, compiling on the server. */
+const BUSY_BADGE: Partial<Record<LiveState, { text: string; color: string }>> = {
+  loading: { text: '…', color: BADGE_COLORS.busy },
+  compiling: { text: 'TeX', color: BADGE_COLORS.local },
+  server: { text: 'SRV', color: BADGE_COLORS.server },
+}
+let badgeQueue: Promise<unknown> = Promise.resolve()
+const mergeSettingsStored = async () => mergeSettings(await getStored('settings'))
+// switching badgeShowsLast redraws the open tabs' badges
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.settings) return
+  chrome.storage.session.get(null).then(all => Object.keys(all).forEach(k => {
+    const m = k.match(/^live:(\d+)$/)
+    if (m) updateBadge(Number(m[1]), {})
+  }))
+})
+
+/** Records what the tab reported, then redraws its badge (one at a time, so writes and reads keep their order). */
+function updateBadge(tabId: number, change: { live?: { state: LiveState; text: string }; last?: LastCompile | null }) {
+  badgeQueue = badgeQueue.then(async () => {
+    const writes: Record<string, unknown> = {}
+    if (change.live) writes[liveKey(tabId)] = { ...change.live, at: Date.now() }
+    if (change.last !== undefined) writes[lastKey(tabId)] = change.last
+    await chrome.storage.session.set(writes)
+    const got = await chrome.storage.session.get([liveKey(tabId), lastKey(tabId)])
+    const live = got[liveKey(tabId)] as { state: LiveState; text: string } | undefined
+    const last = (await mergeSettingsStored()).badgeShowsLast ? (got[lastKey(tabId)] as LastCompile | null | undefined)?.where : undefined
+    const busy = live ? BUSY_BADGE[live.state] : undefined
+    const text = busy ? busy.text : last ? BADGE_TEXT[last] : ''
+    const color = busy ? busy.color : last ? BADGE_COLORS[last] : BADGE_COLORS.busy
+    await chrome.action.setBadgeText({ tabId, text })
+    await chrome.action.setBadgeBackgroundColor({ tabId, color })
+    await chrome.action.setTitle({ tabId, title: live ? `LocaLeaf: ${live.text}` : 'LocaLeaf' })
+  }).catch(() => undefined) // the tab may be gone
 }
 
 chrome.runtime.onMessage.addListener((msg: BackgroundRequest, sender, sendResponse) => {
@@ -130,19 +166,15 @@ chrome.runtime.onMessage.addListener((msg: BackgroundRequest, sender, sendRespon
       return true
     case 'live': {
       const tabId = sender.tab?.id
-      if (tabId !== undefined) chrome.storage.session.set({ [liveKey(tabId)]: { state: msg.state, text: msg.text, at: Date.now() } })
+      // a new page's badge doesn't carry the previous page's last compile
+      if (tabId !== undefined) updateBadge(tabId, { live: { state: msg.state, text: msg.text }, ...(msg.newPage ? { last: null } : {}) })
       sendResponse({ ok: true })
       return false
     }
     case 'status': {
       if (msg.projectId && typeof msg.ms === 'number' && msg.state !== 'idle') recordStats(msg.projectId, msg.state === 'local' ? 'local' : 'server', msg.ms)
       const tabId = sender.tab?.id
-      const b = BADGE[msg.state]
-      if (tabId !== undefined && b) {
-        chrome.action.setBadgeText({ tabId, text: b.text })
-        chrome.action.setBadgeBackgroundColor({ tabId, color: b.color })
-        chrome.action.setTitle({ tabId, title: `LocaLeaf: ${msg.detail ?? msg.state}` })
-      }
+      if (tabId !== undefined && msg.state !== 'idle') updateBadge(tabId, { last: { where: msg.state === 'local' ? 'local' : 'server', detail: msg.detail ?? '' } })
       sendResponse({ ok: true })
       return false
     }

@@ -21,7 +21,7 @@ export type PageRequest =
   | { type: 'clear'; projectId: string }
   | { type: 'debugAbort' }
   /** What the tab is doing right now (shown live in the popup). */
-  | { type: 'live'; state: LiveState; text: string }
+  | { type: 'live'; state: LiveState; text: string; newPage?: boolean }
   /** Merges into the stored settings (e.g. where the progress chip was dragged). */
   | { type: 'updateSettings'; patch: Partial<Settings> }
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
@@ -29,6 +29,9 @@ export type PageRequest =
 export type LiveState = 'loading' | 'compiling' | 'server' | 'idle' | 'off'
 export interface LiveStatus { state: LiveState; text: string; at: number }
 export const liveKey = (tabId: number) => `live:${tabId}`
+/** Where a tab's last compile ran and why (chrome.storage.session, written by the background). */
+export interface LastCompile { where: 'local' | 'server'; detail: string }
+export const lastKey = (tabId: number) => `last:${tabId}`
 
 export interface HelloReply {
   settings: Settings
@@ -70,4 +73,4 @@ export type BackgroundRequest =
   | { type: 'status'; state: 'local' | 'fallback' | 'idle'; detail?: string; projectId?: string; ms?: number; cached?: boolean }
   | { type: 'engineStatus' }
   | { type: 'restartEngine' }
-  | { type: 'live'; state: LiveState; text: string }
+  | { type: 'live'; state: LiveState; text: string; newPage?: boolean }

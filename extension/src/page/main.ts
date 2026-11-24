@@ -43,8 +43,12 @@ const helloDone = start()
 let liveState: LiveState | null = null
 let liveTimer: number | undefined
 let livePending: string | null = null
+let livePageSent = false
 function live(state: LiveState, text: string) {
-  const send = (t: string) => ext({ type: 'live', state, text: t }).catch(() => undefined)
+  // the first report of this page tells the background it's a new page (its badge starts fresh)
+  const newPage = !livePageSent
+  livePageSent = true
+  const send = (t: string) => ext({ type: 'live', state, text: t, newPage }).catch(() => undefined)
   if (state !== liveState) {
     liveState = state
     clearTimeout(liveTimer)
@@ -101,7 +105,14 @@ onEditorSocket(socket => {
 
 async function start() {
   await whenDomReady()
-  projectId = getMeta('ol-project_id') ?? location.pathname.split('/')[2]
+  // only the editor has a project; elsewhere (project list, settings, …) LocaLeaf stays out of the way: no
+  // mirror, no badge
+  const id = getMeta('ol-project_id')
+  if (!id) {
+    log('not a project page: nothing to do')
+    return
+  }
+  projectId = id
   const hello = await ext<HelloReply>({ type: 'hello', projectId })
   settings = hello.settings
   mode = hello.mode

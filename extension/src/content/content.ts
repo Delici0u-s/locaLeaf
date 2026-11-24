@@ -87,7 +87,7 @@ async function handle(req: PageRequest): Promise<unknown> {
       return { kind: 'done', epoch: r.epoch, result: { ...r.result, files } } satisfies CompileReply
     }
     case 'live':
-      return chrome.runtime.sendMessage({ type: 'live', state: req.state, text: req.text })
+      return chrome.runtime.sendMessage({ type: 'live', state: req.state, text: req.text, newPage: req.newPage })
     case 'updateSettings': {
       const current = await getStored('settings')
       await chrome.storage.local.set({ settings: { ...current, ...req.patch } })
