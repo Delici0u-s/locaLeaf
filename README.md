@@ -4,6 +4,11 @@ A browser extension that compiles your Overleaf projects on your own computer in
 server. You keep editing in Overleaf as usual, collaborators included, and the PDF appears in Overleaf's own
 preview. No TeX installation needed: TeX Live 2026 runs inside the extension as WebAssembly.
 
+![The same edit to a thesis, compiled with LocaLeaf (left) and on a self-hosted Overleaf server (right): the local PDF is ready after about 7 s, the server's after about 23 s](docs/media/race.gif)
+
+*The same edit to a thesis: LocaLeaf (left) has the new PDF after about 7 s, the self-hosted server (right)
+after about 23 s.*
+
 > [!NOTE]
 > **AI notice:** this project was written largely with generative AI (Anthropic Claude). The code has not
 > been reviewed line by line by a human, and it runs inside your logged-in Overleaf page. See
