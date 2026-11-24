@@ -22,6 +22,17 @@
       }
     },
     {
+      "name": "missing-end-not-shell-escape",
+      "project": "missing-end",
+      "main": "main.tex",
+      "compiler": "pdflatex",
+      "expect": {
+        "status": "failure",
+        "needsShellEscape": false
+      },
+      "$note": "A document without \\end{document} (TikZ, hyperref) failed as 'needs shell escape' and went to the server; it must stay a local failure."
+    },
+    {
       "name": "subfolder-main",
       "project": "subfolder",
       "main": "doc/main.tex",

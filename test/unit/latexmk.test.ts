@@ -70,3 +70,16 @@ test('shell escape is only reported when it caused errors', () => {
   assert.equal(needsShellEscape(minted), true)
   assert.equal(needsShellEscape('Package shellesc Warning: Shell escape disabled on input line 73.\nno errors here\n'), false)
 })
+
+test('an ordinary error is not a shell-escape problem', () => {
+  const header = 'This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2026)\n restricted \\write18 enabled.\n'
+  assert.equal(needsShellEscape(`${header}! Undefined control sequence.\nl.12 \\foo\n`), false)
+  assert.equal(needsShellEscape(`${header}! Emergency stop.\n<*> main.tex\n\n*** (job aborted, no legal \\end found)\n`), false)
+  // a shell-escape warning elsewhere doesn't make a typo a shell-escape problem
+  assert.equal(needsShellEscape(`${header}Package shellesc Warning: Shell escape disabled on input line 3.\n! Undefined control sequence.\nl.12 \\foo\n`), false)
+})
+
+test('shell-escape errors are recognised', () => {
+  assert.equal(needsShellEscape('! Package minted Error: You must invoke LaTeX with the -shell-escape flag.\n\nSee the minted package documentation for explanation.\n'), true)
+  assert.equal(needsShellEscape("! Package svg Error: You didn't enable `shell escape' (or `write18')\n(svg)                so it wasn't possible to launch the Inkscape export\n"), true)
+})

@@ -45,7 +45,22 @@ export function countErrors(log: string): number {
  *  shell escape, Overleaf's server may. Only counts when the log has errors. */
 export function needsShellEscape(log: string): boolean {
   if (countErrors(log) === 0) return false
-  return /Shell escape disabled|-shell-escape|shell escape|executable is unavailable|\\write18/i.test(log)
+  // Only the error messages count: every log starts with "restricted \write18 enabled.", and a shell-escape
+  // warning elsewhere doesn't mean the error (e.g. a typo) came from it.
+  return errorMessages(log).some(m => /-shell-escape|shell escape|executable is unavailable|\\write18/i.test(m))
+}
+
+/** Each error's message: its "! …" line and the lines up to the source position ("l.12 …") or a blank line. */
+function errorMessages(log: string): string[] {
+  const lines = log.split('\n')
+  const out: string[] = []
+  lines.forEach((line, i) => {
+    if (!line.startsWith('!')) return
+    const block = [line]
+    for (let j = i + 1; j < lines.length && lines[j].trim() !== '' && !/^l\.\d+/.test(lines[j]) && !lines[j].startsWith('!'); j++) block.push(lines[j])
+    out.push(block.join(' '))
+  })
+  return out
 }
 
 /** Font names fontspec couldn't find ("The font "X" cannot be found"), from a TeX log. */
