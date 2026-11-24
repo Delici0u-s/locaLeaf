@@ -11,29 +11,6 @@ preview. No TeX installation needed: TeX Live 2026 runs inside the extension as 
 > been reviewed line by line by a human, and it runs inside your logged-in Overleaf page. See
 > [docs/AI_DISCLOSURE.md](docs/AI_DISCLOSURE.md) for what that means.
 
-## What works
-
-Everything around compiling works as before:
-
-- Recompile, auto-compile, Stop, the compiler, draft mode and "stop on first error"
-- the log pane and error markers in the editor
-- SyncTeX: double-click jumps between the source and the PDF in both directions
-- the download button
-- BibTeX, Biber and makeindex
-
-If a project needs something the local engine can't do, it compiles on the server instead, and a notice says
-why. See [Limitations](#limitations).
-
-**Speed:** after a one-line edit, a short article shows its new PDF in under half a second, a beamer talk or
-a thesis in about 3 s, and a 200-page book in 6–7 s. That is close to native TeX Live on the same computer,
-so it helps most when your server is slow or busy. Measurements: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
-
-**Tested with:** Overleaf Community Edition and overleaf.com, in Brave (Linux), Chrome and Edge (Windows 11).
-It should work in any Chromium-based browser from version 120.
-
-**Needs:** about 260 MB of disk space, and a few hundred MB of memory while compiling. The engine closes
-itself after 15 minutes without use.
-
 ## Install
 
 1. Download `localeaf-<version>.zip` (about 190 MB) from the
@@ -73,6 +50,29 @@ away.
 **Brave** sometimes never shows the permission prompt, and the switch turns itself off again. Then the only
 way is to build from source with `"anySite": true` or your site in `"sites"` (see
 [Building from source](#building-from-source)).
+
+## What works
+
+Everything around compiling works as before:
+
+- Recompile, auto-compile, Stop, the compiler, draft mode and "stop on first error"
+- the log pane and error markers in the editor
+- SyncTeX: double-click jumps between the source and the PDF in both directions
+- the download button
+- BibTeX, Biber and makeindex
+
+If a project needs something the local engine can't do, it compiles on the server instead, and a notice says
+why. See [Limitations](#limitations).
+
+**Speed:** after a one-line edit, a short article shows its new PDF in under half a second, a beamer talk or
+a thesis in about 3 s, and a 200-page book in 6–7 s. That is close to native TeX Live on the same computer,
+so it helps most when your server is slow or busy. Measurements: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+**Tested with:** Overleaf Community Edition and overleaf.com, in Brave (Linux), Chrome and Edge (Windows 11).
+It should work in any Chromium-based browser from version 120.
+
+**Needs:** about 260 MB of disk space, and a few hundred MB of memory while compiling. The engine closes
+itself after 15 minutes without use.
 
 ## Privacy and network
 
