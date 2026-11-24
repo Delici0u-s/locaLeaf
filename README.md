@@ -4,8 +4,6 @@ A browser extension that compiles your Overleaf projects on your own computer in
 server. You keep editing in Overleaf as usual, collaborators included, and the PDF appears in Overleaf's own
 preview. No TeX installation needed: TeX Live 2026 runs inside the extension as WebAssembly.
 
-![Editing the title and recompiling: the PDF updates within a second](docs/media/recompile.gif)
-
 > [!NOTE]
 > **AI notice:** this project was written largely with generative AI (Anthropic Claude). The code has not
 > been reviewed line by line by a human, and it runs inside your logged-in Overleaf page. See
@@ -32,11 +30,11 @@ caches.
    packages), allow it. The page reloads.
 3. Compile as usual.
 
-![The popup: engine status, site switch, local or server per project, statistics](docs/media/popup.png)
+![The popup, labelled: engine status, the switch for this site, local or server per project, live status and statistics, settings](docs/media/popup.png)
 
 While a compile runs, a small indicator next to Overleaf's download button shows what it is doing:
 
-![The progress indicator next to the download button](docs/media/editor.png)
+![Overleaf during a local recompile, labelled: LocaLeaf's progress indicator next to the download button, and the PDF from the local build](docs/media/editor.png)
 
 **Toolbar badge:** **…** while a project loads, **TeX** while it compiles locally, **SRV** while the server
 compiles. Hover over the icon to see what is happening.
