@@ -53,3 +53,12 @@
   kept in IndexedDB across engine restarts (`engine.persistCacheMB`). LuaLaTeX with Fira Sans: first compile of a
   new session 19 s → 3 s. XeLaTeX stays ~30 s on the first compile per session: its fontconfig scan lives only in
   memory in this build (no cache files to keep; tried a writable cachedir, it isn't used).
+
+## Possible later
+
+- [ ] Firefox support. Mostly reusable (page script, mirror, engine). Needed: an engine host without the
+  offscreen API (Firefox background page, or a hidden extension page), a Firefox manifest from the same build
+  (gecko id, `background.scripts`), and e2e tests via Puppeteer + WebDriver BiDi (Playwright can't load
+  Firefox add-ons). Regular Firefox needs Mozilla-signed add-ons (free unlisted signing via `web-ext sign`).
+  Check first in a spike: does a running compile keep the background page alive, and is the engine
+  as fast in Firefox?
